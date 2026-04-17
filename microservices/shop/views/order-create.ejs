@@ -17,7 +17,6 @@
     </div>
     <form method="POST" action="/orders">
       <input type="hidden" name="product_id" value="<%= product.id %>">
-      <input type="hidden" name="shop_id" value="1">
       <div class="mb-3">
         <label class="form-label">Quantity</label>
         <input type="number" name="quantity" class="form-control" min="1" max="<%= product.stock %>" required>

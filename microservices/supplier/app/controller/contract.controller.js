@@ -1,7 +1,7 @@
 const Contract = require("../models/contract.model");
 
 exports.findAll = (req, res) => {
-  const supplierId = parseInt(req.query.supplier_id) || 2;
+  const supplierId = req.session.user.id;
   Contract.findBySupplierId(supplierId, (err, data) => {
     if (err) return res.status(500).render("error", { message: "Error retrieving contracts" });
     res.render("contract-list", { contracts: data });

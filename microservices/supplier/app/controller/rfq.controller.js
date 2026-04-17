@@ -1,7 +1,7 @@
 const RFQ = require("../models/rfq.model");
 
 exports.findAll = (req, res) => {
-  const supplierId = parseInt(req.query.supplier_id) || 2;
+  const supplierId = req.session.user.id;
   RFQ.findBySupplierId(supplierId, (err, data) => {
     if (err) return res.status(500).render("error", { message: "Error retrieving RFQs" });
     res.render("rfq-list", { rfqs: data });
@@ -27,7 +27,7 @@ exports.submitQuote = (req, res) => {
   const unitPrice = parseFloat(req.body.unit_price);
   const moq = parseInt(req.body.moq) || 1;
   const deliveryDays = parseInt(req.body.delivery_days) || 7;
-  const supplierId = parseInt(req.body.supplier_id) || 2;
+  const supplierId = req.session.user.id;
 
   if (isNaN(unitPrice) || unitPrice <= 0) return res.status(400).render("error", { message: "Valid unit price is required" });
   if (moq < 1) return res.status(400).render("error", { message: "MOQ must be at least 1" });

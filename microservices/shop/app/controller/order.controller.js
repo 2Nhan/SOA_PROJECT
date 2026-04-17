@@ -16,7 +16,7 @@ exports.create = (req, res) => {
   // Input validation
   const quantity = parseInt(req.body.quantity);
   const productId = parseInt(req.body.product_id);
-  const shopId = parseInt(req.body.shop_id) || 1;
+  const shopId = req.session.user.id;
 
   if (!quantity || !productId || isNaN(quantity) || isNaN(productId)) {
     return res.status(400).render("error", { message: "Valid quantity and product are required" });
@@ -50,7 +50,7 @@ exports.create = (req, res) => {
 };
 
 exports.findAll = (req, res) => {
-  const shopId = parseInt(req.query.shop_id) || 1;
+  const shopId = req.session.user.id;
   Order.findByShopId(shopId, (err, data) => {
     if (err) { res.status(500).render("error", { message: "Error retrieving orders" }); return; }
     res.render("order-list", { orders: data });

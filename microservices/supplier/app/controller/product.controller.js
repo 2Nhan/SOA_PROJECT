@@ -37,7 +37,7 @@ exports.create = [
       }
 
       const newProduct = {
-        supplier_id: parseInt(req.body.supplier_id) || 1,
+        supplier_id: req.session.user.id,
         name: name,
         description: (req.body.description || "").replace(/<[^>]*>/g, "").substring(0, 2000),
         price: price,

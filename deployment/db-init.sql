@@ -110,10 +110,11 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 -- Seed data: Users
+-- Default password for all seed users: password123
 INSERT INTO users (email, password_hash, full_name, role, status) VALUES
-('shop1@b2bmarket.com', 'hashed_password', 'ABC Retail Shop', 'shop', 'approved'),
-('supplier1@b2bmarket.com', 'hashed_password', 'XYZ Supplies Co.', 'supplier', 'approved'),
-('admin@b2bmarket.com', 'hashed_password', 'System Admin', 'admin', 'approved');
+('shop1@b2bmarket.com', '$2b$10$s5xeeleYCNzElp0kOCgNuu3qpMk4lNNkca8UJ/NSElLxzugbV376C', 'ABC Retail Shop', 'shop', 'approved'),
+('supplier1@b2bmarket.com', '$2b$10$s5xeeleYCNzElp0kOCgNuu3qpMk4lNNkca8UJ/NSElLxzugbV376C', 'XYZ Supplies Co.', 'supplier', 'approved'),
+('admin@b2bmarket.com', '$2b$10$s5xeeleYCNzElp0kOCgNuu3qpMk4lNNkca8UJ/NSElLxzugbV376C', 'System Admin', 'admin', 'approved');
 
 -- Seed data: Products (status 'active' = already approved by admin)
 INSERT INTO products (supplier_id, name, description, price, stock, status, category, image_url) VALUES

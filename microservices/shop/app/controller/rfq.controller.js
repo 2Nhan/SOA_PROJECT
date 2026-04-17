@@ -1,7 +1,7 @@
 const RFQ = require("../models/rfq.model");
 
 exports.findAll = (req, res) => {
-  const shopId = parseInt(req.query.shop_id) || 1;
+  const shopId = req.session.user.id;
   RFQ.findByShopId(shopId, (err, data) => {
     if (err) return res.status(500).render("error", { message: "Error retrieving RFQs" });
     res.render("rfq-list", { rfqs: data });
@@ -34,7 +34,7 @@ exports.create = (req, res) => {
   const quantity = parseInt(req.body.quantity);
   const productId = parseInt(req.body.product_id);
   const supplierId = parseInt(req.body.supplier_id);
-  const shopId = parseInt(req.body.shop_id) || 1;
+  const shopId = req.session.user.id;
 
   if (!quantity || !productId || !supplierId || isNaN(quantity)) {
     return res.status(400).render("error", { message: "All fields are required" });

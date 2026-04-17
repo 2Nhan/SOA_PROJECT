@@ -1,13 +1,27 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container">
     <a class="navbar-brand" href="/">B2B Marketplace - Shop</a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/">Home</a>
-      <a class="nav-link" href="/products">Products</a>
-      <a class="nav-link" href="/rfqs">My RFQs</a>
-      <a class="nav-link" href="/contracts">Contracts</a>
-      <a class="nav-link" href="/orders">Orders</a>
-      <a class="nav-link" href="/admin/">Supplier Panel</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <div class="navbar-nav">
+        <a class="nav-link" href="/">Home</a>
+        <a class="nav-link" href="/products">Products</a>
+        <a class="nav-link" href="/rfqs">My RFQs</a>
+        <a class="nav-link" href="/contracts">Contracts</a>
+        <a class="nav-link" href="/orders">Orders</a>
+        <a class="nav-link" href="/admin/">Supplier Panel</a>
+      </div>
+      <div class="navbar-nav ms-auto">
+        <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+          <a class="nav-link" href="/profile">👤 <%= currentUser.full_name %></a>
+          <a class="nav-link text-warning" href="/logout">Logout</a>
+        <% } else { %>
+          <a class="nav-link" href="/login">Login</a>
+          <a class="nav-link" href="/register">Register</a>
+        <% } %>
+      </div>
     </div>
   </div>
 </nav>
