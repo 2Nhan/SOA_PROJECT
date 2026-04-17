@@ -28,8 +28,10 @@
             </table>
             <% if (product.stock > 0) { %>
               <a href="/orders/new/<%= product.id %>" class="btn btn-success">Place Order</a>
+              <a href="/rfqs/new/<%= product.id %>" class="btn btn-outline-primary ms-2">Send RFQ</a>
             <% } else { %>
               <button class="btn btn-secondary" disabled>Out of Stock</button>
+              <a href="/rfqs/new/<%= product.id %>" class="btn btn-outline-primary ms-2">Send RFQ</a>
             <% } %>
           </div>
         </div>

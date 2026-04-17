@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>User Management - Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container mt-4">
+    <h2>User Management</h2>
+    <a href="/admin/manage" class="btn btn-sm btn-secondary mb-3">Back to Admin Dashboard</a>
+    <table class="table table-hover">
+      <thead class="table-dark">
+        <tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        <% users.forEach(u => { %>
+        <tr>
+          <td><%= u.id %></td>
+          <td><%= u.full_name %></td>
+          <td><%= u.email %></td>
+          <td><span class="badge bg-<%= u.role === 'admin' ? 'danger' : u.role === 'supplier' ? 'primary' : 'success' %>"><%= u.role %></span></td>
+          <td>
+            <% if (u.status === 'approved') { %><span class="badge bg-success">Approved</span>
+            <% } else if (u.status === 'pending') { %><span class="badge bg-warning">Pending</span>
+            <% } else { %><span class="badge bg-danger">Rejected</span><% } %>
+          </td>
+          <td><%= new Date(u.created_at).toLocaleDateString() %></td>
+          <td>
+            <% if (u.status === 'pending') { %>
+            <form action="/admin/manage/users/<%= u.id %>/approve" method="POST" class="d-inline">
+              <button class="btn btn-sm btn-success">Approve</button>
+            </form>
+            <form action="/admin/manage/users/<%= u.id %>/reject" method="POST" class="d-inline">
+              <button class="btn btn-sm btn-warning">Reject</button>
+            </form>
+            <% } %>
+            <% if (u.role !== 'admin') { %>
+            <form action="/admin/manage/users/<%= u.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('Delete this user?')">
+              <button class="btn btn-sm btn-danger">Delete</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

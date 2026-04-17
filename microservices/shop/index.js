@@ -10,58 +10,47 @@ const app = express();
 
 // --------------- SECURITY ---------------
 
-// HTTP security headers (XSS, clickjacking, MIME sniffing, etc.)
 app.use(helmet({
-  contentSecurityPolicy: false // disable CSP for EJS + CDN Bootstrap
+  contentSecurityPolicy: false
 }));
 
-// CORS - restrict origins in production
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS || "*",
   methods: ["GET", "POST"]
 }));
 
-// Rate limiting - prevent brute force / DDoS
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // max 200 requests per window per IP
+  windowMs: 15 * 60 * 1000,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: "Too many requests from this IP, please try again later."
 });
 app.use(limiter);
 
-// Stricter rate limit for order creation (prevent spam)
 const orderLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // max 10 orders per minute per IP
+  windowMs: 60 * 1000,
+  max: 10,
   message: "Too many orders submitted. Please wait a moment."
 });
 
 // --------------- PERFORMANCE ---------------
 
-// Gzip compression for responses
 app.use(compression());
-
-// Request logging (combined format for production, dev for local)
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
 // --------------- APP CONFIG ---------------
 
-// View engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// Static files with cache headers
 app.use(express.static(path.join(__dirname, "public"), {
   maxAge: process.env.NODE_ENV === "production" ? "1d" : 0
 }));
 
-// Body parser with size limits (prevent large payload attacks)
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(express.json({ limit: "1mb" }));
 
-// Trust proxy (required behind ALB for correct IP in rate limiter)
 app.set("trust proxy", 1);
 
 // --------------- HEALTH CHECK ---------------
@@ -79,17 +68,32 @@ app.get("/health", (req, res) => {
 
 const productController = require("./app/controller/product.controller");
 const orderController = require("./app/controller/order.controller");
+const rfqController = require("./app/controller/rfq.controller");
+const contractController = require("./app/controller/contract.controller");
 
 // Home
 app.get("/", (req, res) => {
   res.render("home");
 });
 
-// Products - read only
+// Products - read only (only show approved/active products)
 app.get("/products", productController.findAll);
 app.get("/products/:id", productController.findOne);
 
-// Orders - create + read (with stricter rate limit on POST)
+// RFQs - shop sends RFQ, reviews quotes
+app.get("/rfqs", rfqController.findAll);
+app.get("/rfqs/new/:productId", rfqController.createForm);
+app.post("/rfqs", orderLimiter, rfqController.create);
+app.get("/rfqs/:id", rfqController.findOne);
+app.post("/rfqs/:id/accept/:quoteId", orderLimiter, rfqController.acceptQuote);
+app.post("/rfqs/:id/reject/:quoteId", orderLimiter, rfqController.rejectQuote);
+
+// Contracts
+app.get("/contracts", contractController.findAll);
+app.get("/contracts/:id", contractController.findOne);
+app.post("/contracts/:id/order", orderLimiter, contractController.createOrder);
+
+// Orders - create + read
 app.get("/orders", orderController.findAll);
 app.get("/orders/new/:productId", orderController.createForm);
 app.post("/orders", orderLimiter, orderController.create);
@@ -97,12 +101,10 @@ app.get("/orders/:id", orderController.findOne);
 
 // --------------- ERROR HANDLING ---------------
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).render("error", { message: "Page not found" });
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error(`[ERROR] ${new Date().toISOString()} - ${err.stack}`);
   res.status(500).render("error", {
@@ -132,7 +134,6 @@ function shutdown(signal) {
       process.exit(0);
     });
   });
-  // Force exit after 10 seconds
   setTimeout(() => {
     console.error("[Shop Service] Forced shutdown after timeout.");
     process.exit(1);

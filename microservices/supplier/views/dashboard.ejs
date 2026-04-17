@@ -1,38 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Admin Dashboard - B2B Marketplace</title>
+  <title>Supplier Dashboard - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
 <body>
   <%- include('partials/nav') %>
   <div class="container mt-4">
-    <h2>Supplier / Admin Dashboard</h2>
+    <h2>Supplier Dashboard</h2>
     <div class="row mt-3">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <div class="card text-white bg-primary mb-3">
           <div class="card-body text-center">
-            <h5>📦 Products</h5>
+            <h5>Products</h5>
             <p>Manage your product listings</p>
             <a href="/admin/products" class="btn btn-light btn-sm">Manage Products</a>
           </div>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+          <div class="card-body text-center">
+            <h5>RFQs</h5>
+            <p>View and respond to RFQs</p>
+            <a href="/admin/rfqs" class="btn btn-light btn-sm">View RFQs</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-white bg-dark mb-3">
+          <div class="card-body text-center">
+            <h5>Contracts</h5>
+            <p>Confirm and manage contracts</p>
+            <a href="/admin/contracts" class="btn btn-light btn-sm">View Contracts</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
         <div class="card text-white bg-success mb-3">
           <div class="card-body text-center">
-            <h5>📋 Orders</h5>
+            <h5>Orders</h5>
             <p>View and process orders</p>
             <a href="/admin/orders" class="btn btn-light btn-sm">Manage Orders</a>
           </div>
         </div>
       </div>
-      <div class="col-md-4">
-        <div class="card text-white bg-secondary mb-3">
-          <div class="card-body text-center">
-            <h5>🏪 Shop View</h5>
-            <p>See how customers view products</p>
-            <a href="/" class="btn btn-light btn-sm">Go to Shop</a>
+    </div>
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card border-warning">
+          <div class="card-header bg-warning">Admin Panel</div>
+          <div class="card-body">
+            <p>Manage users, approve products, and monitor system activity.</p>
+            <a href="/admin/manage" class="btn btn-warning">Go to Admin Panel</a>
           </div>
         </div>
       </div>

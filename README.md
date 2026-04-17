@@ -24,11 +24,18 @@ A microservices-based B2B marketplace system deployed on AWS using containerized
 
 ## Project Overview
 
-The system models a B2B marketplace where **shops** (buyers) browse products and place orders, while **suppliers** (sellers) manage inventory, upload product images, confirm orders, and process payments. The application is split into two independently deployable microservices, each running in its own Docker container on AWS ECS Fargate.
+The system models a B2B marketplace with **three roles**:
+- **Shop** (buyer) — browse products, send RFQs, review quotes, manage contracts, place orders
+- **Supplier** (seller) — manage inventory, upload product images, respond to RFQs with quotes, confirm contracts/orders, process payments
+- **Admin** (system controller) — approve/reject new users and products, monitor all RFQs, contracts, and system activity
+
+The full B2B procurement flow is: **RFQ → Quote → Contract → Order → Payment**, following real-world B2B purchasing processes. The application is split into two independently deployable microservices, each running in its own Docker container on AWS ECS Fargate. The Admin role is hosted within the Supplier Service under a dedicated route prefix (`/admin/manage/*`) — a deliberate design choice to optimize costs while maintaining clean code separation (own controller, model, and views) that allows extraction into a 3rd service when scaling demands it.
 
 Key design decisions:
-- Separation of concerns between buyer-facing and seller-facing operations
+- Three-role system (Shop, Supplier, Admin) with approval workflows
+- End-to-end RFQ → Quote → Contract → Order → Payment flow
 - Saga pattern for distributed transaction management with compensating actions
+- Admin approval gates for new users and product listings
 - S3-based image storage for product photos
 - Security hardening with Helmet, CORS, rate limiting, and input validation
 - Graceful shutdown for zero-downtime deployments
@@ -86,28 +93,33 @@ Traffic routing is handled by a single Application Load Balancer with path-based
 
 ## Microservices
 
-### Shop Service (Customer/Buyer)
+### Shop Service (Buyer)
 
-Handles the buyer-facing experience. Customers can browse the product catalog, search for items, view product images, and place orders.
+Handles the buyer-facing experience. Shops browse products, send RFQs to suppliers, review quotes, accept/reject quotes to form contracts, and create orders from contracts.
 
 | Responsibility | Description |
 |---|---|
-| Product browsing | View all active products with images, search and filtering |
-| Product details | View product info with image, stock levels, supplier |
-| Order placement | Create orders with stock validation and reservation |
+| Product browsing | View all approved products with images, search and filtering |
+| RFQ management | Send Request for Quotation to suppliers for specific products |
+| Quote review | Review supplier quotes, accept or reject them |
+| Contract management | View contracts formed from accepted quotes |
+| Order placement | Create orders from contracts with stock validation |
 | Order tracking | View order history and current status |
 
-### Supplier Service (Admin/Seller)
+### Supplier Service (Seller + Admin)
 
-Handles the seller-facing operations. Suppliers manage their product inventory with image uploads to S3, process incoming orders, and handle payments.
+Handles seller operations and system administration. Suppliers manage inventory, respond to RFQs with quotes, confirm contracts and orders, and process payments. The Admin role (integrated here) approves users/products and monitors system activity.
 
 | Responsibility | Description |
 |---|---|
 | Product management | Full CRUD with image upload to Amazon S3 |
-| Image management | Upload, replace, and delete product images on S3 |
+| RFQ response | View incoming RFQs and submit quotes (price, MOQ, delivery) |
+| Contract management | Confirm or cancel contracts formed from accepted quotes |
 | Order management | View, confirm, or cancel incoming orders |
 | Payment processing | Process payments for confirmed orders |
-| Stock management | Automatic stock adjustment on order/cancel/payment events |
+| **Admin: User approval** | Approve/reject new user registrations, delete users |
+| **Admin: Product approval** | Approve/reject product listings before they go live |
+| **Admin: System monitoring** | Dashboard with stats, view all RFQs and contracts |
 
 Both services are stateless and connect to a shared MySQL database. Each service runs independently in its own container and can be scaled, updated, or restarted without affecting the other.
 
@@ -117,43 +129,61 @@ Both services are stateless and connect to a shared MySQL database. Each service
 
 The system implements the Saga pattern for managing distributed transactions across the order lifecycle. Each step has a corresponding compensating action that executes on failure.
 
-### End-to-End Order Flow
+### End-to-End B2B Procurement Flow
 
 ```
-Step 1: CREATE ORDER (Shop Service)
-  |  Validate product exists and is active
-  |  Check stock availability
+Step 1: SEND RFQ (Shop Service)
+  |  Shop selects a product and sends RFQ with desired quantity
+  |  RFQ status: pending
+  v
+Step 2: SUBMIT QUOTE (Supplier Service)
+  |  Supplier reviews RFQ and submits quote (unit_price, MOQ, delivery_days)
+  |  RFQ status: quoted
+  |
+  |  [No response] --> RFQ remains pending
+  v
+Step 3: ACCEPT/REJECT QUOTE (Shop Service)
+  |  Shop reviews quote and accepts or rejects
+  |  [Accept] --> BEGIN TRANSACTION
+  |                Update quote status: accepted
+  |                Update RFQ status: accepted
+  |                Create contract record
+  |              COMMIT
+  |  [Reject] --> Update quote status: rejected
+  v
+Step 4: CONFIRM CONTRACT (Supplier Service)
+  |  Supplier confirms the contract
+  |  Contract status: pending --> confirmed
+  |
+  |  [Cancel] --> Contract status: cancelled
+  v
+Step 5: CREATE ORDER FROM CONTRACT (Shop Service)
+  |  Shop creates order linked to the contract
   |  BEGIN TRANSACTION
+  |    Validate stock availability
   |    Insert order record (status: pending)
   |    Deduct stock from product
   |  COMMIT
   |
   |  [Failure] --> Rollback: no order created, stock unchanged
   v
-Step 2: CONFIRM ORDER (Supplier Service)
+Step 6: CONFIRM ORDER (Supplier Service)
   |  Supplier reviews and confirms the order
   |  Update order status: pending --> confirmed
   |
   |  [Reject] --> CANCEL ORDER (compensating transaction)
-  |               BEGIN TRANSACTION
-  |                 Update order status --> cancelled
-  |                 Restore stock to product
-  |               COMMIT
+  |               Restore stock to product
   v
-Step 3: PROCESS PAYMENT (Supplier Service)
-  |  Verify order is in confirmed status
+Step 7: PROCESS PAYMENT (Supplier Service)
   |  Validate payment method (bank_transfer, qr_code, cod)
   |  BEGIN TRANSACTION
   |    Insert payment record (status: success)
   |    Update order status: confirmed --> paid
   |  COMMIT
   |
-  |  [Payment Failure] --> COMPENSATING TRANSACTION
-  |                        Cancel order (status --> cancelled)
-  |                        Restore stock to product
-  |                        Record failure reason
+  |  [Payment Failure] --> Compensating: cancel order + restore stock
   v
-Step 4: ORDER COMPLETE
+Step 8: ORDER COMPLETE
   Final state: order.status = 'paid', payment recorded
 ```
 
@@ -296,30 +326,63 @@ The application implements multiple layers of security:
 ## Database Schema
 
 ```sql
-users          -- Registered accounts (shops and suppliers)
+users          -- Registered accounts
   id           INT PRIMARY KEY AUTO_INCREMENT
   email        VARCHAR(255) UNIQUE
   full_name    VARCHAR(255)
   role         ENUM('shop', 'supplier', 'admin')
+  status       ENUM('pending', 'approved', 'rejected') DEFAULT 'pending'
 
-products       -- Product catalog managed by suppliers
+products       -- Product catalog (requires admin approval)
   id           INT PRIMARY KEY AUTO_INCREMENT
   supplier_id  INT FOREIGN KEY -> users.id
   name         VARCHAR(255)
   description  TEXT
   price        DECIMAL(12,2)
   stock        INT
-  status       ENUM('active', 'inactive', 'pending')
-  image_url    VARCHAR(500)          -- S3 image URL
+  status       ENUM('active', 'inactive', 'pending') DEFAULT 'pending'
+  image_url    VARCHAR(500)
   category     VARCHAR(100)
 
-orders         -- Purchase orders created by shops
+rfqs           -- Request for Quotation from shops
+  id           INT PRIMARY KEY AUTO_INCREMENT
+  shop_id      INT FOREIGN KEY -> users.id
+  supplier_id  INT FOREIGN KEY -> users.id
+  product_id   INT FOREIGN KEY -> products.id
+  quantity     INT
+  message      TEXT
+  status       ENUM('pending', 'quoted', 'accepted', 'rejected', 'expired')
+
+quotes         -- Supplier responses to RFQs
+  id           INT PRIMARY KEY AUTO_INCREMENT
+  rfq_id       INT FOREIGN KEY -> rfqs.id
+  supplier_id  INT FOREIGN KEY -> users.id
+  unit_price   DECIMAL(12,2)
+  moq          INT                   -- Minimum order quantity
+  delivery_days INT
+  note         TEXT
+  status       ENUM('pending', 'accepted', 'rejected')
+
+contracts      -- Agreements formed from accepted quotes
+  id           INT PRIMARY KEY AUTO_INCREMENT
+  quote_id     INT FOREIGN KEY -> quotes.id
+  shop_id      INT FOREIGN KEY -> users.id
+  supplier_id  INT FOREIGN KEY -> users.id
+  product_id   INT FOREIGN KEY -> products.id
+  quantity     INT
+  unit_price   DECIMAL(12,2)
+  total_amount DECIMAL(12,2)
+  delivery_days INT
+  status       ENUM('pending', 'confirmed', 'cancelled', 'completed')
+
+orders         -- Purchase orders (can be linked to contracts)
   id           INT PRIMARY KEY AUTO_INCREMENT
   shop_id      INT FOREIGN KEY -> users.id
   product_id   INT FOREIGN KEY -> products.id
+  contract_id  INT FOREIGN KEY -> contracts.id (nullable)
   quantity     INT
   total_price  DECIMAL(12,2)
-  status       ENUM('pending', 'confirmed', 'paid', 'cancelled')
+  status       ENUM('pending', 'confirmed', 'paid', 'cancelled', 'delivering', 'delivered')
   note         TEXT
 
 payments       -- Payment records for confirmed orders
@@ -339,32 +402,59 @@ payments       -- Payment records for confirmed orders
 | Method | Path | Description |
 |---|---|---|
 | GET | `/` | Home page |
-| GET | `/health` | Health check (returns JSON with status, uptime) |
-| GET | `/products` | List all active products with images (supports `?search=keyword`) |
-| GET | `/products/:id` | Product detail page with image |
+| GET | `/health` | Health check |
+| GET | `/products` | List all approved products (supports `?search=`) |
+| GET | `/products/:id` | Product detail with "Send RFQ" button |
+| GET | `/rfqs` | List shop's RFQs with quote status |
+| GET | `/rfqs/new/:productId` | RFQ creation form |
+| POST | `/rfqs` | Submit new RFQ |
+| GET | `/rfqs/:id` | RFQ detail with quotes and accept/reject |
+| POST | `/rfqs/:id/accept/:quoteId` | Accept a quote → create contract |
+| POST | `/rfqs/:id/reject/:quoteId` | Reject a quote |
+| GET | `/contracts` | List shop's contracts |
+| GET | `/contracts/:id` | Contract detail |
+| POST | `/contracts/:id/order` | Create order from confirmed contract |
 | GET | `/orders` | List orders for current shop |
-| GET | `/orders/new/:productId` | Order creation form |
-| POST | `/orders` | Submit new order (rate limited: 10/min) |
+| GET | `/orders/new/:productId` | Order creation form (direct) |
+| POST | `/orders` | Submit new order |
 | GET | `/orders/:id` | Order detail page |
 
 ### Supplier Service (port 8080)
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/health` | Health check (returns JSON with status, uptime) |
+| GET | `/health` | Health check |
 | GET | `/admin/` | Supplier dashboard |
 | GET | `/admin/products` | List all products with images |
-| GET | `/admin/products/add` | Add product form (with image upload) |
+| GET | `/admin/products/add` | Add product form |
 | POST | `/admin/products` | Create product + upload image to S3 |
-| GET | `/admin/products/edit/:id` | Edit product form (shows current image) |
+| GET | `/admin/products/edit/:id` | Edit product form |
 | POST | `/admin/products/update/:id` | Update product + replace image on S3 |
 | POST | `/admin/products/delete/:id` | Delete product + remove image from S3 |
+| GET | `/admin/rfqs` | List supplier's incoming RFQs |
+| GET | `/admin/rfqs/:id` | RFQ detail with quote form |
+| POST | `/admin/rfqs/:id/quote` | Submit quote for an RFQ |
+| GET | `/admin/contracts` | List supplier's contracts |
+| GET | `/admin/contracts/:id` | Contract detail |
+| POST | `/admin/contracts/:id/confirm` | Confirm contract |
+| POST | `/admin/contracts/:id/cancel` | Cancel contract |
 | GET | `/admin/orders` | List all orders |
-| GET | `/admin/orders/:id` | Order detail with action buttons |
-| POST | `/admin/orders/:id/confirm` | Confirm pending order (rate limited) |
-| POST | `/admin/orders/:id/cancel` | Cancel order + restore stock (rate limited) |
+| GET | `/admin/orders/:id` | Order detail with actions |
+| POST | `/admin/orders/:id/confirm` | Confirm order |
+| POST | `/admin/orders/:id/cancel` | Cancel order + restore stock |
 | GET | `/admin/orders/:id/payment` | Payment form |
-| POST | `/admin/orders/:id/payment` | Process payment (rate limited) |
+| POST | `/admin/orders/:id/payment` | Process payment |
+| GET | `/admin/manage` | Admin dashboard (stats) |
+| GET | `/admin/manage/users` | User management (approve/reject/delete) |
+| POST | `/admin/manage/users/:id/approve` | Approve user |
+| POST | `/admin/manage/users/:id/reject` | Reject user |
+| POST | `/admin/manage/users/:id/delete` | Delete user |
+| GET | `/admin/manage/products` | Product approval list |
+| POST | `/admin/manage/products/:id/approve` | Approve product |
+| POST | `/admin/manage/products/:id/reject` | Reject product |
+| POST | `/admin/manage/products/:id/delete` | Delete product |
+| GET | `/admin/manage/rfqs` | All RFQs (read-only) |
+| GET | `/admin/manage/contracts` | All contracts (read-only) |
 
 ---
 
@@ -404,7 +494,7 @@ docker-compose down -v       # Stop services, delete database volume
 ├── README.md                             # This file
 ├── docker-compose.yml                    # Local development environment
 ├── docs/
-│   └── architecture-diagram.html         # Visual architecture diagram (open in browser)
+│   └── architecture-diagram.html         # Visual architecture diagram
 ├── deployment/
 │   ├── db-init.sql                       # Database schema and seed data
 │   ├── appspec-shop.yaml                 # CodeDeploy spec for Shop
@@ -416,39 +506,49 @@ docker-compose down -v       # Stop services, delete database volume
 └── microservices/
     ├── shop/                             # Shop (Buyer) Microservice
     │   ├── Dockerfile
-    │   ├── buildspec.yml                 # CodeBuild configuration
+    │   ├── buildspec.yml
     │   ├── package.json
-    │   ├── index.js                      # Express server + security middleware + routes
+    │   ├── index.js                      # Express server + routes
     │   ├── app/
     │   │   ├── config/
-    │   │   │   ├── config.js             # Database configuration (env vars)
-    │   │   │   └── db.js                 # MySQL connection pool
+    │   │   │   ├── config.js
+    │   │   │   └── db.js
     │   │   ├── controller/
-    │   │   │   ├── product.controller.js # Input validation + sanitization
-    │   │   │   └── order.controller.js   # Input validation + Saga step 1
+    │   │   │   ├── product.controller.js
+    │   │   │   ├── order.controller.js
+    │   │   │   ├── rfq.controller.js     # RFQ creation, quote accept/reject
+    │   │   │   └── contract.controller.js # Contract view, order from contract
     │   │   └── models/
-    │   │       ├── product.model.js      # Read-only product queries
-    │   │       └── order.model.js        # Order creation with stock reservation
-    │   └── views/                        # EJS templates (Bootstrap 5 + product images)
-    └── supplier/                         # Supplier (Admin) Microservice
+    │   │       ├── product.model.js
+    │   │       ├── order.model.js
+    │   │       ├── rfq.model.js          # RFQ CRUD, quote accept/reject logic
+    │   │       └── contract.model.js     # Contract queries, order creation
+    │   └── views/                        # EJS templates (Bootstrap 5)
+    └── supplier/                         # Supplier + Admin Microservice
         ├── Dockerfile
         ├── buildspec.yml
         ├── package.json
-        ├── index.js                      # Express server + security middleware + routes
+        ├── index.js                      # Express server + routes
         ├── app/
         │   ├── config/
-        │   │   ├── config.js             # Database configuration
-        │   │   ├── db.js                 # MySQL connection pool
-        │   │   └── s3.js                 # S3 client + multer upload middleware
+        │   │   ├── config.js
+        │   │   ├── db.js
+        │   │   └── s3.js                 # S3 client + multer
         │   ├── controller/
-        │   │   ├── product.controller.js # CRUD with S3 image upload/delete
-        │   │   ├── order.controller.js   # Confirm/cancel with compensating transactions
-        │   │   └── payment.controller.js # Payment processing with method validation
+        │   │   ├── product.controller.js
+        │   │   ├── order.controller.js
+        │   │   ├── payment.controller.js
+        │   │   ├── rfq.controller.js     # View RFQs, submit quotes
+        │   │   ├── contract.controller.js # Confirm/cancel contracts
+        │   │   └── admin.controller.js   # User/product approval, dashboard
         │   └── models/
-        │       ├── product.model.js      # Full CRUD with image_url
-        │       ├── order.model.js        # Confirm/cancel with stock rollback
-        │       └── payment.model.js      # Payment with Saga compensating logic
-        └── views/                        # EJS templates (Bootstrap 5 + image upload forms)
+        │       ├── product.model.js
+        │       ├── order.model.js
+        │       ├── payment.model.js
+        │       ├── rfq.model.js          # RFQ queries, quote submission
+        │       ├── contract.model.js     # Contract CRUD
+        │       └── admin.model.js        # User/product approval, stats
+        └── views/                        # EJS templates (Bootstrap 5)
 ```
 
 ---

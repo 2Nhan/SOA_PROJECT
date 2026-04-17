@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Contract Detail - Supplier</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container mt-4">
+    <h2>Contract #<%= contract.id %></h2>
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <p><strong>Product:</strong> <%= contract.product_name %></p>
+            <p><strong>Shop:</strong> <%= contract.shop_name %></p>
+            <p><strong>Quantity:</strong> <%= contract.quantity %></p>
+            <p><strong>Unit Price:</strong> $<%= parseFloat(contract.unit_price).toFixed(2) %></p>
+          </div>
+          <div class="col-md-6">
+            <p><strong>Total Amount:</strong> $<%= parseFloat(contract.total_amount).toFixed(2) %></p>
+            <p><strong>Delivery:</strong> <%= contract.delivery_days %> days</p>
+            <p><strong>Status:</strong>
+              <% if (contract.status === 'draft') { %><span class="badge bg-warning">Awaiting Your Confirmation</span>
+              <% } else if (contract.status === 'confirmed') { %><span class="badge bg-success">Confirmed</span>
+              <% } else if (contract.status === 'completed') { %><span class="badge bg-primary">Completed</span>
+              <% } else { %><span class="badge bg-danger">Cancelled</span><% } %>
+            </p>
+            <p><strong>Created:</strong> <%= new Date(contract.created_at).toLocaleDateString() %></p>
+          </div>
+        </div>
+        <% if (contract.status === 'draft') { %>
+        <hr>
+        <form action="/admin/contracts/<%= contract.id %>/confirm" method="POST" class="d-inline">
+          <button class="btn btn-success">Confirm Contract</button>
+        </form>
+        <form action="/admin/contracts/<%= contract.id %>/cancel" method="POST" class="d-inline ms-2">
+          <button class="btn btn-danger">Cancel Contract</button>
+        </form>
+        <% } %>
+      </div>
+    </div>
+    <a href="/admin/contracts" class="btn btn-secondary">Back to Contracts</a>
+  </div>
+</body>
+</html>
