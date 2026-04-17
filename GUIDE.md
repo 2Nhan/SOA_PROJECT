@@ -17,7 +17,7 @@
 | Trade-off | Current Choice | Why | Impact |
 |---|---|---|---|
 | **Shared Database** | Both services use same RDS MySQL | Simpler setup, saves budget (1 RDS instead of 2) | Not ideal microservices pattern, but acceptable for this project scope |
-| **No Authentication** | Hardcoded `shop_id: 1` | Keeps project focused on microservices + AWS, not auth | Mention in report as simplification |
+| **Session-based Auth** | bcrypt + express-session (memory store) | Zero extra AWS cost, no external auth service | Production would use Redis/DynamoDB session store; memory store is fine for demo |
 | **Admin in Supplier Service** | Admin role hosted under `/admin/manage/*` in Supplier service | Saves cost (no 3rd ECS task ~$7-15/month), Admin is low-traffic | Clean code separation (own controller/model/views) allows extraction to 3rd service later |
 | **Synchronous Communication** | Services share DB directly, no message queue | SQS/SNS would add complexity and cost | For 2 services this is fine; note in report that async (SQS) would be better at scale |
 | **No API Gateway** | ALB routes directly to services | API Gateway costs extra and adds complexity | ALB path-based routing is sufficient for 2 services |
@@ -39,16 +39,18 @@
 | Missing Admin role | FIXED | Admin controller/model/views in Supplier service (`/admin/manage/*`) |
 | Missing RFQ flow | FIXED | Full RFQ → Quote → Contract → Order → Payment flow |
 | User/Product approval | FIXED | Admin approves new users and product listings before they go live |
+| Authentication | FIXED | bcrypt password hashing + express-session, login/register/profile/change password |
+| Role-based access | FIXED | `requireAuth` middleware on all routes, `requireAdmin` for admin routes |
 
 ### What NOT to Add (Out of Scope / Budget Risk)
 
 - **Amazon SQS/SNS** - adds cost, not required
 - **Amazon API Gateway** - $3.50/million requests, ALB is enough
-- **ElastiCache/Redis** - unnecessary for this scale
+- **ElastiCache/Redis** - unnecessary for this scale (session memory store is fine for demo)
 - **Multi-AZ RDS** - doubles DB cost
 - **NAT Gateway** - ~$0.045/hr ($32/month!) - use public subnets instead
 - **Multiple environments (dev/staging/prod)** - one environment is enough
-- **Amazon Cognito** - auth is not the focus
+- **Amazon Cognito** - bcrypt + express-session is zero-cost alternative
 
 ---
 
@@ -56,6 +58,9 @@
 
 | Layer | Package | Description |
 |---|---|---|
+| Authentication | `bcryptjs` | Password hashing with 10 salt rounds |
+| Session Management | `express-session` | Server-side sessions, 24h cookie, memory store |
+| Auth Middleware | Custom | `requireAuth` on all routes, `requireAdmin` for admin-only routes |
 | HTTP Headers | `helmet` | X-XSS-Protection, X-Content-Type-Options, X-Frame-Options, HSTS |
 | CORS | `cors` | Configurable origin restriction via `ALLOWED_ORIGINS` env var |
 | Rate Limiting | `express-rate-limit` | Global: 200 req/15min. Write ops: 10-20 req/min per IP |
@@ -281,14 +286,21 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 
 This is the recommended demo flow for the presentation. It demonstrates the 3-role system, RFQ→Quote→Contract flow, Saga pattern, and compensating transactions.
 
+### Step 0: Login & Registration
+1. Open Shop login page (`/login`) → Login as `shop1@b2bmarket.com` / `password123`
+2. Show nav bar with user name, profile link, logout
+3. Open Supplier login page (`/admin/login`) → Login as `admin@b2bmarket.com` / `password123`
+4. Optionally demo registration: Register new shop account → show "pending approval" message
+5. Explain: "All passwords are hashed with bcrypt. Sessions expire after 24 hours."
+
 ### Step 1: Admin Approval (Admin Role)
-1. Open Supplier Panel → Admin Dashboard (`/admin/manage`)
+1. Open Supplier Panel → Admin Dashboard (`/admin/manage`) (logged in as admin)
 2. Show pending users → Approve a user
 3. Show pending products → Approve a product listing
 4. Explain: "New users and products require admin approval before going live"
 
 ### Step 2: Show Product Catalog (Shop Service)
-1. Open Shop home page → Browse Products
+1. Open Shop home page (logged in as shop) → Browse Products
 2. Show product images (loaded from S3), search functionality
 3. Click a product → show detail page with "Send RFQ" button
 

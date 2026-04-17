@@ -311,6 +311,8 @@ The application implements multiple layers of security:
 
 | Layer | Implementation | Description |
 |---|---|---|
+| Authentication | `bcryptjs` + `express-session` | Password hashing (10 salt rounds), session-based login, role-based access control |
+| Auth Middleware | `requireAuth`, `requireAdmin` | All routes protected; admin routes require admin role |
 | HTTP Headers | `helmet` | Sets security headers: X-XSS-Protection, X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options |
 | CORS | `cors` | Configurable origin restriction via `ALLOWED_ORIGINS` env var |
 | Rate Limiting | `express-rate-limit` | Global: 200 req/15min per IP. Write operations: 10-20 req/min per IP |
@@ -329,6 +331,7 @@ The application implements multiple layers of security:
 users          -- Registered accounts
   id           INT PRIMARY KEY AUTO_INCREMENT
   email        VARCHAR(255) UNIQUE
+  password_hash VARCHAR(255)
   full_name    VARCHAR(255)
   role         ENUM('shop', 'supplier', 'admin')
   status       ENUM('pending', 'approved', 'rejected') DEFAULT 'pending'
@@ -401,6 +404,14 @@ payments       -- Payment records for confirmed orders
 
 | Method | Path | Description |
 |---|---|---|
+| GET | `/login` | Login page |
+| POST | `/login` | Authenticate user (shop role only) |
+| GET | `/register` | Registration page |
+| POST | `/register` | Create new shop account (pending approval) |
+| GET | `/logout` | Logout and destroy session |
+| GET | `/profile` | View/edit profile and change password |
+| POST | `/profile` | Update profile (name, email) |
+| POST | `/profile/password` | Change password |
 | GET | `/` | Home page |
 | GET | `/health` | Health check |
 | GET | `/products` | List all approved products (supports `?search=`) |
@@ -424,6 +435,14 @@ payments       -- Payment records for confirmed orders
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Health check |
+| GET | `/admin/login` | Login page |
+| POST | `/admin/login` | Authenticate user (supplier/admin roles only) |
+| GET | `/admin/register` | Registration page |
+| POST | `/admin/register` | Create new supplier account (pending approval) |
+| GET | `/admin/logout` | Logout and destroy session |
+| GET | `/admin/profile` | View/edit profile and change password |
+| POST | `/admin/profile` | Update profile (name, email) |
+| POST | `/admin/profile/password` | Change password |
 | GET | `/admin/` | Supplier dashboard |
 | GET | `/admin/products` | List all products with images |
 | GET | `/admin/products/add` | Add product form |
@@ -477,6 +496,14 @@ docker-compose up --build
 
 The database is automatically initialized with schema and seed data from `deployment/db-init.sql`, including placeholder product images from Unsplash.
 
+### Demo Credentials
+
+| Email | Password | Role | Service |
+|---|---|---|---|
+| `shop1@b2bmarket.com` | `password123` | Shop | Shop (`/login`) |
+| `supplier1@b2bmarket.com` | `password123` | Supplier | Supplier (`/admin/login`) |
+| `admin@b2bmarket.com` | `password123` | Admin | Supplier (`/admin/login`) |
+
 ### Stopping
 
 ```bash
@@ -514,11 +541,13 @@ docker-compose down -v       # Stop services, delete database volume
     │   │   │   ├── config.js
     │   │   │   └── db.js
     │   │   ├── controller/
+    │   │   │   ├── auth.controller.js    # Login, register, profile, password
     │   │   │   ├── product.controller.js
     │   │   │   ├── order.controller.js
     │   │   │   ├── rfq.controller.js     # RFQ creation, quote accept/reject
     │   │   │   └── contract.controller.js # Contract view, order from contract
     │   │   └── models/
+    │   │       ├── auth.model.js         # Register, login, profile, password
     │   │       ├── product.model.js
     │   │       ├── order.model.js
     │   │       ├── rfq.model.js          # RFQ CRUD, quote accept/reject logic
@@ -535,6 +564,7 @@ docker-compose down -v       # Stop services, delete database volume
         │   │   ├── db.js
         │   │   └── s3.js                 # S3 client + multer
         │   ├── controller/
+        │   │   ├── auth.controller.js    # Login, register, profile, password
         │   │   ├── product.controller.js
         │   │   ├── order.controller.js
         │   │   ├── payment.controller.js
@@ -542,6 +572,7 @@ docker-compose down -v       # Stop services, delete database volume
         │   │   ├── contract.controller.js # Confirm/cancel contracts
         │   │   └── admin.controller.js   # User/product approval, dashboard
         │   └── models/
+        │       ├── auth.model.js         # Register, login, profile, password
         │       ├── product.model.js
         │       ├── order.model.js
         │       ├── payment.model.js
@@ -563,6 +594,7 @@ docker-compose down -v       # Stop services, delete database volume
 | Database | MySQL 8.0 (via mysql2 connection pool) |
 | Image Storage | Amazon S3 (via @aws-sdk/client-s3) |
 | File Upload | Multer (memory storage, 5MB limit) |
+| Authentication | bcryptjs (password hashing), express-session (sessions) |
 | Security | Helmet, CORS, express-rate-limit, input validation |
 | Performance | Compression (gzip), Morgan (logging) |
 | Containerization | Docker |
