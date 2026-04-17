@@ -1,6 +1,8 @@
 # Knowledge/PDF files
 *.pdf
 knowledge/
+plans/
+step-by-step-guide.md
 
 # Node modules
 node_modules/
