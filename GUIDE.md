@@ -18,6 +18,7 @@
 |---|---|---|---|
 | **Shared Database** | Both services use same RDS MySQL | Simpler setup, saves budget (1 RDS instead of 2) | Not ideal microservices pattern, but acceptable for this project scope |
 | **No Authentication** | Hardcoded `shop_id: 1` | Keeps project focused on microservices + AWS, not auth | Mention in report as simplification |
+| **Admin in Supplier Service** | Admin role hosted under `/admin/manage/*` in Supplier service | Saves cost (no 3rd ECS task ~$7-15/month), Admin is low-traffic | Clean code separation (own controller/model/views) allows extraction to 3rd service later |
 | **Synchronous Communication** | Services share DB directly, no message queue | SQS/SNS would add complexity and cost | For 2 services this is fine; note in report that async (SQS) would be better at scale |
 | **No API Gateway** | ALB routes directly to services | API Gateway costs extra and adds complexity | ALB path-based routing is sufficient for 2 services |
 | **Single AZ deployment** | One subnet for cost savings | Multi-AZ doubles RDS cost | Acceptable for demo; mention Multi-AZ for production |
@@ -35,6 +36,9 @@
 | Product images | FIXED | S3 upload with multer (5MB, JPEG/PNG/GIF/WebP) |
 | Error handling | FIXED | Global error middleware, 404 handler |
 | Health checks | FIXED | `/health` endpoint for ALB |
+| Missing Admin role | FIXED | Admin controller/model/views in Supplier service (`/admin/manage/*`) |
+| Missing RFQ flow | FIXED | Full RFQ → Quote → Contract → Order → Payment flow |
+| User/Product approval | FIXED | Admin approves new users and product listings before they go live |
 
 ### What NOT to Add (Out of Scope / Budget Risk)
 
@@ -273,47 +277,54 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 
 ---
 
-## 5. Demo Script (Saga Workflow)
+## 5. Demo Script (Full B2B Procurement + Saga Workflow)
 
-This is the recommended demo flow for the presentation. It demonstrates the Saga pattern, compensating transactions, and the full order lifecycle.
+This is the recommended demo flow for the presentation. It demonstrates the 3-role system, RFQ→Quote→Contract flow, Saga pattern, and compensating transactions.
 
-### Step 1: Show Product Catalog (Shop Service)
-1. Open Shop home page -> Browse Products
+### Step 1: Admin Approval (Admin Role)
+1. Open Supplier Panel → Admin Dashboard (`/admin/manage`)
+2. Show pending users → Approve a user
+3. Show pending products → Approve a product listing
+4. Explain: "New users and products require admin approval before going live"
+
+### Step 2: Show Product Catalog (Shop Service)
+1. Open Shop home page → Browse Products
 2. Show product images (loaded from S3), search functionality
-3. Click a product -> show detail page with image
+3. Click a product → show detail page with "Send RFQ" button
 
-### Step 2: Create Order (Saga Step 1 - Reserve Stock)
-1. Note the current stock level (e.g., 100)
-2. Place an order with quantity 10
-3. Show order created with status "pending"
-4. Go back to products -> stock is now 90
+### Step 3: RFQ → Quote → Contract Flow
+1. **Shop**: Click "Send RFQ" on a product → fill quantity and message → Submit
+2. Show RFQ created with status "pending"
+3. **Supplier**: Go to RFQs (`/admin/rfqs`) → see incoming RFQ
+4. Submit a quote (unit price, MOQ, delivery days)
+5. **Shop**: Go to My RFQs → see quote received → Accept the quote
+6. Show contract automatically created from accepted quote
+7. **Supplier**: Go to Contracts → Confirm the contract
 
-### Step 3: Confirm Order (Saga Step 2 - Supplier)
-1. Switch to Supplier Panel (/admin/)
-2. Go to Orders -> see the new pending order
-3. Click Confirm -> status changes to "confirmed"
+### Step 4: Create Order from Contract (Saga Step 1)
+1. **Shop**: Go to Contracts → Click "Create Order from Contract"
+2. Note the current stock level (e.g., 100)
+3. Order created with stock deducted (stock: 90)
 
-### Step 4: Process Payment (Saga Step 3 - Payment)
-1. Click "Process Payment" on the confirmed order
-2. Select payment method (bank_transfer / qr_code / cod)
-3. Submit -> status changes to "paid"
-4. Payment is recorded in payments table
+### Step 5: Confirm Order & Payment (Saga Steps 2-3)
+1. **Supplier**: Go to Orders → Confirm the pending order
+2. Process Payment (bank_transfer / qr_code / cod)
+3. Status: pending → confirmed → paid
 
-### Step 5: Demonstrate Failure Handling (Compensating Transaction)
+### Step 6: Demonstrate Failure Handling (Compensating Transaction)
 1. Create another order (quantity: 5, stock goes from 90 to 85)
 2. Confirm the order
 3. Cancel the order from Supplier Panel
 4. Show stock restored to 90 (compensating transaction)
-5. Show order status changed to "cancelled"
 
-### Step 6: Show AWS Infrastructure
-1. Open ECS Console -> show running tasks
-2. Open ALB Console -> show listener rules and target groups
-3. Open CloudWatch -> show log streams
-4. Open S3 Console -> show uploaded product images
-5. Open CodePipeline -> show pipeline stages (if configured)
+### Step 7: Show AWS Infrastructure
+1. Open ECS Console → show running tasks
+2. Open ALB Console → show listener rules and target groups
+3. Open CloudWatch → show log streams
+4. Open S3 Console → show uploaded product images
+5. Open CodePipeline → show pipeline stages (if configured)
 
-### Step 7: Demonstrate CI/CD (Update & Redeploy)
+### Step 8: Demonstrate CI/CD (Update & Redeploy)
 1. Make a small change (e.g., update home page text)
 2. Push to CodeCommit
 3. Show pipeline automatically triggered
