@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Orders - B2B Marketplace</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container mt-4">
+    <h2>My Orders</h2>
+    <% if (orders.length === 0) { %>
+      <p class="text-muted">No orders yet. <a href="/products">Browse products</a> to place an order.</p>
+    <% } else { %>
+      <table class="table table-striped">
+        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th><th></th></tr></thead>
+        <tbody>
+          <% orders.forEach(function(o) { %>
+            <tr>
+              <td><%= o.id %></td>
+              <td><%= o.product_name %></td>
+              <td><%= o.quantity %></td>
+              <td>$<%= parseFloat(o.total_price).toFixed(2) %></td>
+              <td>
+                <% if (o.status === 'pending') { %><span class="badge bg-warning">Pending</span>
+                <% } else if (o.status === 'confirmed') { %><span class="badge bg-info">Confirmed</span>
+                <% } else if (o.status === 'paid') { %><span class="badge bg-success">Paid</span>
+                <% } else if (o.status === 'cancelled') { %><span class="badge bg-danger">Cancelled</span>
+                <% } else { %><span class="badge bg-secondary"><%= o.status %></span><% } %>
+              </td>
+              <td><%= new Date(o.created_at).toLocaleDateString() %></td>
+              <td><a href="/orders/<%= o.id %>" class="btn btn-sm btn-outline-primary">View</a></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</body>
+</html>

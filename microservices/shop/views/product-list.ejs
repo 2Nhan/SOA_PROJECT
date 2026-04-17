@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Products - B2B Marketplace</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container mt-4">
+    <h2>Products</h2>
+    <form method="GET" action="/products" class="mb-3">
+      <div class="input-group">
+        <input type="text" name="search" class="form-control" placeholder="Search products..." value="<%= keyword %>">
+        <button class="btn btn-primary" type="submit">Search</button>
+      </div>
+    </form>
+    <div class="row">
+      <% if (products.length === 0) { %>
+        <p class="text-muted">No products found.</p>
+      <% } %>
+      <% products.forEach(function(p) { %>
+        <div class="col-md-4 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5 class="card-title"><%= p.name %></h5>
+              <p class="text-muted"><%= p.category %></p>
+              <p><%= p.description ? p.description.substring(0, 100) : '' %></p>
+              <p class="fw-bold text-success">$<%= parseFloat(p.price).toFixed(2) %></p>
+              <p class="text-muted">Stock: <%= p.stock %> | Supplier: <%= p.supplier_name %></p>
+              <a href="/products/<%= p.id %>" class="btn btn-primary btn-sm">View Details</a>
+              <a href="/orders/new/<%= p.id %>" class="btn btn-success btn-sm">Order Now</a>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</body>
+</html>

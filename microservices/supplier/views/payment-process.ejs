@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Process Payment - Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container mt-4">
+    <a href="/admin/orders/<%= order_id %>" class="btn btn-secondary btn-sm mb-3">&larr; Back</a>
+    <h2>Process Payment for Order #<%= order_id %></h2>
+    <div class="card">
+      <div class="card-body">
+        <form method="POST" action="/admin/orders/<%= order_id %>/payment">
+          <div class="mb-3">
+            <label class="form-label">Payment Method</label>
+            <select name="method" class="form-select">
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="qr_code">QR Code</option>
+              <option value="cod">Cash on Delivery</option>
+            </select>
+          </div>
+          <div class="alert alert-info">
+            <strong>Note:</strong> If payment fails, the order will be automatically cancelled and product stock will be restored (Saga compensating transaction).
+          </div>
+          <button type="submit" class="btn btn-success">💳 Confirm Payment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

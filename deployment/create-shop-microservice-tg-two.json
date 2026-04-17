@@ -1,0 +1,30 @@
+{
+  "cluster": "microservices-serverlesscluster",
+  "serviceName": "shop-microservice",
+  "taskDefinition": "shop:<REVISION-NUMBER>",
+  "loadBalancers": [
+    {
+      "targetGroupArn": "<ARN-shop-tg-two>",
+      "containerName": "shop",
+      "containerPort": 8080
+    }
+  ],
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "<PUBLIC-SUBNET-1-ID>",
+        "<PUBLIC-SUBNET-2-ID>"
+      ],
+      "securityGroups": [
+        "<MICROSERVICES-SG-ID>"
+      ],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "deploymentController": {
+    "type": "CODE_DEPLOY"
+  }
+}

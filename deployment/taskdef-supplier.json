@@ -1,0 +1,53 @@
+{
+  "family": "supplier",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "supplier",
+      "image": "<IMAGE1_NAME>",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "APP_DB_HOST",
+          "value": "<RDS-ENDPOINT>"
+        },
+        {
+          "name": "APP_DB_USER",
+          "value": "admin"
+        },
+        {
+          "name": "APP_DB_PASSWORD",
+          "value": "lab-password"
+        },
+        {
+          "name": "APP_DB_NAME",
+          "value": "b2bmarket"
+        },
+        {
+          "name": "APP_DB_PORT",
+          "value": "3306"
+        }
+      ],
+      "essential": true,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/supplier",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT-ID>:role/LabRole",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT-ID>:role/LabRole"
+}

@@ -1,0 +1,30 @@
+{
+  "cluster": "microservices-serverlesscluster",
+  "serviceName": "supplier-microservice",
+  "taskDefinition": "supplier:<REVISION-NUMBER>",
+  "loadBalancers": [
+    {
+      "targetGroupArn": "<ARN-supplier-tg-two>",
+      "containerName": "supplier",
+      "containerPort": 8080
+    }
+  ],
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "<PUBLIC-SUBNET-1-ID>",
+        "<PUBLIC-SUBNET-2-ID>"
+      ],
+      "securityGroups": [
+        "<MICROSERVICES-SG-ID>"
+      ],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "deploymentController": {
+    "type": "CODE_DEPLOY"
+  }
+}
