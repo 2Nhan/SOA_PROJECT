@@ -13,6 +13,7 @@ A microservices-based B2B marketplace system deployed on AWS using containerized
 - [CI/CD Pipeline](#cicd-pipeline)
 - [AWS Infrastructure](#aws-infrastructure)
 - [IAM Roles and Permissions](#iam-roles-and-permissions)
+- [Security Features](#security-features)
 - [Database Schema](#database-schema)
 - [API Endpoints](#api-endpoints)
 - [Local Development](#local-development)
@@ -23,13 +24,16 @@ A microservices-based B2B marketplace system deployed on AWS using containerized
 
 ## Project Overview
 
-The system models a B2B marketplace where **shops** (buyers) browse products and place orders, while **suppliers** (sellers) manage inventory, confirm orders, and process payments. The application is split into two independently deployable microservices, each running in its own Docker container on AWS ECS Fargate.
+The system models a B2B marketplace where **shops** (buyers) browse products and place orders, while **suppliers** (sellers) manage inventory, upload product images, confirm orders, and process payments. The application is split into two independently deployable microservices, each running in its own Docker container on AWS ECS Fargate.
 
 Key design decisions:
 - Separation of concerns between buyer-facing and seller-facing operations
 - Saga pattern for distributed transaction management with compensating actions
+- S3-based image storage for product photos
+- Security hardening with Helmet, CORS, rate limiting, and input validation
+- Graceful shutdown for zero-downtime deployments
 - Infrastructure-as-code approach for reproducible deployments
-- Blue/green deployment strategy for zero-downtime updates
+- Blue/green deployment strategy via CodeDeploy
 
 ---
 
@@ -53,12 +57,14 @@ Key design decisions:
                | (Fargate)  |  | (Fargate)     |
                | Port 8080  |  | Port 8080     |
                +--------+--+  +--+-----------+
-                        |        |
-                    +---v--------v----+
-                    | Amazon RDS      |
-                    | MySQL 8.0       |
-                    | (db.t3.micro)   |
-                    +-----------------+
+                        |        |       |
+                    +---v--------v--+    |
+                    | Amazon RDS    |    |
+                    | MySQL 8.0     |    v
+                    | (db.t3.micro) |  +-------------+
+                    +---------------+  | Amazon S3   |
+                                       | (Images)    |
+                                       +-------------+
 
     +--------------------------------------------------+
     | CI/CD Pipeline                                    |
@@ -82,22 +88,23 @@ Traffic routing is handled by a single Application Load Balancer with path-based
 
 ### Shop Service (Customer/Buyer)
 
-Handles the buyer-facing experience. Customers can browse the product catalog, search for items, and place orders.
+Handles the buyer-facing experience. Customers can browse the product catalog, search for items, view product images, and place orders.
 
 | Responsibility | Description |
 |---|---|
-| Product browsing | View all active products with search and filtering |
-| Product details | View individual product information, stock levels, supplier |
+| Product browsing | View all active products with images, search and filtering |
+| Product details | View product info with image, stock levels, supplier |
 | Order placement | Create orders with stock validation and reservation |
 | Order tracking | View order history and current status |
 
 ### Supplier Service (Admin/Seller)
 
-Handles the seller-facing operations. Suppliers manage their product inventory, process incoming orders, and handle payments.
+Handles the seller-facing operations. Suppliers manage their product inventory with image uploads to S3, process incoming orders, and handle payments.
 
 | Responsibility | Description |
 |---|---|
-| Product management | Full CRUD operations on product listings |
+| Product management | Full CRUD with image upload to Amazon S3 |
+| Image management | Upload, replace, and delete product images on S3 |
 | Order management | View, confirm, or cancel incoming orders |
 | Payment processing | Process payments for confirmed orders |
 | Stock management | Automatic stock adjustment on order/cancel/payment events |
@@ -135,6 +142,7 @@ Step 2: CONFIRM ORDER (Supplier Service)
   v
 Step 3: PROCESS PAYMENT (Supplier Service)
   |  Verify order is in confirmed status
+  |  Validate payment method (bank_transfer, qr_code, cod)
   |  BEGIN TRANSACTION
   |    Insert payment record (status: success)
   |    Update order status: confirmed --> paid
@@ -158,6 +166,7 @@ Step 4: ORDER COMPLETE
 | Order cancelled (pending) | Supplier cancels pending order | Stock restored to original level |
 | Order cancelled (confirmed) | Supplier cancels confirmed order | Stock restored to original level |
 | Payment failure | Database error during payment | Order cancelled + stock restored |
+| Invalid payment method | Method not in whitelist | Request rejected with validation error |
 
 ---
 
@@ -224,6 +233,7 @@ Stage 3: DEPLOY (CodeDeploy to ECS)
 | Amazon ECR | Docker image registry | 2 repositories (shop, supplier) |
 | Application Load Balancer | Traffic routing and health checks | Path-based routing, health check on /health |
 | Amazon RDS | Managed MySQL database | db.t3.micro, MySQL 8.0, Single-AZ, 20GB gp2 |
+| Amazon S3 | Product image storage | Public-read bucket for product photos |
 | AWS CodeCommit | Source code repository | Main branch triggers pipeline |
 | AWS CodeBuild | Docker image builds | Managed build environment with Docker |
 | AWS CodeDeploy | ECS blue/green deployments | Automated traffic shifting |
@@ -248,7 +258,7 @@ The project uses the pre-configured `LabRole` provided by AWS Academy Learner La
 | Context | Role | Purpose |
 |---|---|---|
 | ECS Task Execution Role | `LabRole` | Pull images from ECR, push logs to CloudWatch |
-| ECS Task Role | `LabRole` | Runtime permissions for containers to access AWS services |
+| ECS Task Role | `LabRole` | Runtime permissions: access RDS, S3, CloudWatch |
 | CodeBuild Service Role | `LabRole` | Access ECR, S3, CloudWatch during builds |
 | CodeDeploy Service Role | `LabRole` | Manage ECS deployments, ALB target groups |
 | CodePipeline Service Role | `LabRole` | Orchestrate pipeline stages, access artifacts in S3 |
@@ -262,6 +272,24 @@ The `LabRole` provides broad permissions across supported AWS services but opera
 - Cannot create IAM users, groups, or custom roles
 - Cannot enable RDS enhanced monitoring
 - Maximum 9 concurrent EC2 instances
+
+---
+
+## Security Features
+
+The application implements multiple layers of security:
+
+| Layer | Implementation | Description |
+|---|---|---|
+| HTTP Headers | `helmet` | Sets security headers: X-XSS-Protection, X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options |
+| CORS | `cors` | Configurable origin restriction via `ALLOWED_ORIGINS` env var |
+| Rate Limiting | `express-rate-limit` | Global: 200 req/15min per IP. Write operations: 10-20 req/min per IP |
+| Input Validation | Custom middleware | All params parsed and validated (type, range, length). NaN/injection checks |
+| XSS Prevention | HTML tag stripping | All text inputs sanitized with regex `/<[^>]*>/g` removal |
+| Payload Limits | Express body-parser | Request body capped at 1MB (10MB for image uploads) |
+| File Validation | `multer` | Image uploads: 5MB max, JPEG/PNG/GIF/WebP only |
+| Trust Proxy | Express config | Correct client IP behind ALB for rate limiting |
+| Error Handling | Global middleware | Production: generic messages. Development: stack traces |
 
 ---
 
@@ -282,6 +310,7 @@ products       -- Product catalog managed by suppliers
   price        DECIMAL(12,2)
   stock        INT
   status       ENUM('active', 'inactive', 'pending')
+  image_url    VARCHAR(500)          -- S3 image URL
   category     VARCHAR(100)
 
 orders         -- Purchase orders created by shops
@@ -310,32 +339,32 @@ payments       -- Payment records for confirmed orders
 | Method | Path | Description |
 |---|---|---|
 | GET | `/` | Home page |
-| GET | `/health` | Health check for ALB |
-| GET | `/products` | List all active products (supports `?search=keyword`) |
-| GET | `/products/:id` | Product detail page |
+| GET | `/health` | Health check (returns JSON with status, uptime) |
+| GET | `/products` | List all active products with images (supports `?search=keyword`) |
+| GET | `/products/:id` | Product detail page with image |
 | GET | `/orders` | List orders for current shop |
 | GET | `/orders/new/:productId` | Order creation form |
-| POST | `/orders` | Submit new order |
+| POST | `/orders` | Submit new order (rate limited: 10/min) |
 | GET | `/orders/:id` | Order detail page |
 
 ### Supplier Service (port 8080)
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/health` | Health check for ALB |
+| GET | `/health` | Health check (returns JSON with status, uptime) |
 | GET | `/admin/` | Supplier dashboard |
-| GET | `/admin/products` | List all products |
-| GET | `/admin/products/add` | Add product form |
-| POST | `/admin/products` | Create new product |
-| GET | `/admin/products/edit/:id` | Edit product form |
-| POST | `/admin/products/update/:id` | Update product |
-| POST | `/admin/products/delete/:id` | Delete product |
+| GET | `/admin/products` | List all products with images |
+| GET | `/admin/products/add` | Add product form (with image upload) |
+| POST | `/admin/products` | Create product + upload image to S3 |
+| GET | `/admin/products/edit/:id` | Edit product form (shows current image) |
+| POST | `/admin/products/update/:id` | Update product + replace image on S3 |
+| POST | `/admin/products/delete/:id` | Delete product + remove image from S3 |
 | GET | `/admin/orders` | List all orders |
-| GET | `/admin/orders/:id` | Order detail with actions |
-| POST | `/admin/orders/:id/confirm` | Confirm pending order |
-| POST | `/admin/orders/:id/cancel` | Cancel order (restores stock) |
+| GET | `/admin/orders/:id` | Order detail with action buttons |
+| POST | `/admin/orders/:id/confirm` | Confirm pending order (rate limited) |
+| POST | `/admin/orders/:id/cancel` | Cancel order + restore stock (rate limited) |
 | GET | `/admin/orders/:id/payment` | Payment form |
-| POST | `/admin/orders/:id/payment` | Process payment |
+| POST | `/admin/orders/:id/payment` | Process payment (rate limited) |
 
 ---
 
@@ -344,7 +373,7 @@ payments       -- Payment records for confirmed orders
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- No AWS account required for local testing
+- No AWS account required for local testing (S3 uploads will fail locally but URL images from seed data will work)
 
 ### Running Locally
 
@@ -356,7 +385,7 @@ docker-compose up --build
 # Supplier panel:  http://localhost:8081/admin/
 ```
 
-The database is automatically initialized with schema and seed data from `deployment/db-init.sql`.
+The database is automatically initialized with schema and seed data from `deployment/db-init.sql`, including placeholder product images from Unsplash.
 
 ### Stopping
 
@@ -374,6 +403,8 @@ docker-compose down -v       # Stop services, delete database volume
 ├── GUIDE.md                              # Deployment guide and budget management
 ├── README.md                             # This file
 ├── docker-compose.yml                    # Local development environment
+├── docs/
+│   └── architecture-diagram.html         # Visual architecture diagram (open in browser)
 ├── deployment/
 │   ├── db-init.sql                       # Database schema and seed data
 │   ├── appspec-shop.yaml                 # CodeDeploy spec for Shop
@@ -387,36 +418,37 @@ docker-compose down -v       # Stop services, delete database volume
     │   ├── Dockerfile
     │   ├── buildspec.yml                 # CodeBuild configuration
     │   ├── package.json
-    │   ├── index.js                      # Express server + routes
+    │   ├── index.js                      # Express server + security middleware + routes
     │   ├── app/
     │   │   ├── config/
-    │   │   │   ├── config.js             # Database configuration
-    │   │   │   └── db.js                 # Connection pool
+    │   │   │   ├── config.js             # Database configuration (env vars)
+    │   │   │   └── db.js                 # MySQL connection pool
     │   │   ├── controller/
-    │   │   │   ├── product.controller.js
-    │   │   │   └── order.controller.js
+    │   │   │   ├── product.controller.js # Input validation + sanitization
+    │   │   │   └── order.controller.js   # Input validation + Saga step 1
     │   │   └── models/
-    │   │       ├── product.model.js
-    │   │       └── order.model.js
-    │   └── views/                        # EJS templates (Bootstrap 5)
+    │   │       ├── product.model.js      # Read-only product queries
+    │   │       └── order.model.js        # Order creation with stock reservation
+    │   └── views/                        # EJS templates (Bootstrap 5 + product images)
     └── supplier/                         # Supplier (Admin) Microservice
         ├── Dockerfile
         ├── buildspec.yml
         ├── package.json
-        ├── index.js
+        ├── index.js                      # Express server + security middleware + routes
         ├── app/
         │   ├── config/
-        │   │   ├── config.js
-        │   │   └── db.js
+        │   │   ├── config.js             # Database configuration
+        │   │   ├── db.js                 # MySQL connection pool
+        │   │   └── s3.js                 # S3 client + multer upload middleware
         │   ├── controller/
-        │   │   ├── product.controller.js
-        │   │   ├── order.controller.js
-        │   │   └── payment.controller.js
+        │   │   ├── product.controller.js # CRUD with S3 image upload/delete
+        │   │   ├── order.controller.js   # Confirm/cancel with compensating transactions
+        │   │   └── payment.controller.js # Payment processing with method validation
         │   └── models/
-        │       ├── product.model.js
-        │       ├── order.model.js
-        │       └── payment.model.js
-        └── views/
+        │       ├── product.model.js      # Full CRUD with image_url
+        │       ├── order.model.js        # Confirm/cancel with stock rollback
+        │       └── payment.model.js      # Payment with Saga compensating logic
+        └── views/                        # EJS templates (Bootstrap 5 + image upload forms)
 ```
 
 ---
@@ -428,7 +460,11 @@ docker-compose down -v       # Stop services, delete database volume
 | Runtime | Node.js 18 (Alpine) |
 | Framework | Express.js 4.x |
 | Template Engine | EJS with Bootstrap 5 |
-| Database | MySQL 8.0 (via mysql2 driver) |
+| Database | MySQL 8.0 (via mysql2 connection pool) |
+| Image Storage | Amazon S3 (via @aws-sdk/client-s3) |
+| File Upload | Multer (memory storage, 5MB limit) |
+| Security | Helmet, CORS, express-rate-limit, input validation |
+| Performance | Compression (gzip), Morgan (logging) |
 | Containerization | Docker |
 | Orchestration | Amazon ECS on Fargate |
 | Load Balancing | AWS Application Load Balancer |
