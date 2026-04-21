@@ -1,6 +1,6 @@
 {
-  "cluster": "microservices-serverlesscluster",
-  "serviceName": "shop-microservice",
+  "cluster": "b2b-marketplace",
+  "serviceName": "shop-service",
   "taskDefinition": "shop:<REVISION-NUMBER>",
   "loadBalancers": [
     {
@@ -19,7 +19,7 @@
         "<PUBLIC-SUBNET-2-ID>"
       ],
       "securityGroups": [
-        "<MICROSERVICES-SG-ID>"
+        "<B2B-ECS-SG-ID>"
       ],
       "assignPublicIp": "ENABLED"
     }

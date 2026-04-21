@@ -264,16 +264,16 @@ docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 
 | AWS Service | Purpose | Configuration |
 |---|---|---|
-| Amazon ECS (Fargate) | Container orchestration | 2 services, 1 task each, 0.25 vCPU / 512MB |
-| Amazon ECR | Docker image registry | 2 repositories (shop, supplier) |
-| Application Load Balancer | Traffic routing and health checks | Path-based routing, health check on /health |
-| Amazon RDS | Managed MySQL database | db.t3.micro, MySQL 8.0, Single-AZ, 20GB gp2 |
-| Amazon S3 | Product image storage | Public-read bucket for product photos |
-| AWS CodeCommit | Source code repository | Main branch triggers pipeline |
-| AWS Cloud9 | Development environment | IDE for building Docker images and pushing to ECR |
-| AWS CodeDeploy | ECS blue/green deployments | Automated traffic shifting |
-| AWS CodePipeline | Pipeline orchestration | Source -> Build -> Deploy |
-| Amazon CloudWatch | Logging and monitoring | Log groups: /ecs/shop, /ecs/supplier |
+| Amazon ECS (Fargate) | Container orchestration | 2 services, 1 task each, 0.25 vCPU / 512MB RAM |
+| Amazon ECR | Docker image registry | 2 private repositories (shop, supplier) |
+| Application Load Balancer | Traffic routing & health checks | Path-based routing (`/admin/*` → Supplier, default → Shop), 4 target groups for blue/green |
+| Amazon RDS (MySQL 8.0) | Managed database | db.t3.micro, Single-AZ, 20GB gp2 |
+| Amazon S3 | Product image storage | Public-read bucket for supplier product photos |
+| AWS Cloud9 | Development environment | t3.small, Amazon Linux 2, for Docker builds and ECR pushes |
+| AWS CodeCommit | Source code repository | Stores project code, main branch |
+| AWS CodeDeploy | ECS blue/green deployments | 2 deployment groups, 4 target groups, auto-rollback on failure |
+| AWS CodePipeline | Pipeline orchestration | Source (ECR) → Deploy (CodeDeploy), skip build stage |
+| Amazon CloudWatch | Logging and monitoring | Log groups: `/ecs/shop`, `/ecs/supplier`, CPU/memory alarms |
 
 ### Network Configuration
 

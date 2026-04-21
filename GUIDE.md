@@ -40,18 +40,21 @@ Open `docs/architecture-diagram.html` in a browser to view the system architectu
 
 Access the [AWS Pricing Calculator](https://calculator.aws/). Select Region: **US East (N. Virginia) (us-east-1)**. Add services and assume an operational time of **1 month** (Learner Lab budget):
 
-| Service | Configuration | Estimated Cost/Day | Estimated Cost/Month |
-|---|---|---|---|
-| Amazon RDS (MySQL) | db.t3.micro, 20GB gp2, Single-AZ | $0.41 | $12.41 |
-| Amazon ECS (Fargate) | 2 Tasks × 0.25 vCPU, 0.5GB RAM | $0.58 | $17.47 |
-| Application Load Balancer | 1 ALB, minimal LCUs | $0.54 | $16.43 |
-| Amazon S3 | ~10MB product images | ~$0.00 | ~$0.01 |
-| Amazon ECR | ~500MB Docker images | ~$0.02 | ~$0.50 |
-| Amazon CloudWatch | Log storage | ~$0.02 | ~$0.50 |
-| AWS CodePipeline | 2 pipelines (free tier: 1 free) | ~$0.03 | ~$1.00 |
-| AWS CodeDeploy | ECS deployments (free) | $0.00 | $0.00 |
-| AWS CodeCommit | 1 repo (free tier: 5 users) | $0.00 | $0.00 |
-| **TOTAL** | | **~$1.60** | **~$48** |
+| Service | Configuration | Pricing Detail | Cost/Hour | Cost/Day | Cost/Month |
+|---|---|---|---|---|---|
+| Amazon RDS (MySQL) | db.t3.micro, 20GB gp2, Single-AZ | $0.017/hr | $0.017 | $0.41 | $12.24 |
+| Amazon ECS (Fargate) — Shop | 0.25 vCPU, 0.5GB RAM | vCPU: $0.04048/hr, Mem: $0.004445/GB/hr | $0.012 | $0.30 | $8.89 |
+| Amazon ECS (Fargate) — Supplier | 0.25 vCPU, 0.5GB RAM | Same as above | $0.012 | $0.30 | $8.89 |
+| Application Load Balancer | 1 ALB, ~0.5 LCU avg | $0.0225/hr + $0.008/LCU-hr | $0.027 | $0.64 | $19.44 |
+| Amazon S3 | ~10MB product images | $0.023/GB/month | — | ~$0.00 | ~$0.01 |
+| Amazon ECR | ~400MB Docker images (2 repos) | $0.10/GB/month | — | ~$0.01 | ~$0.04 |
+| Amazon CloudWatch | Log storage (~1GB/month) | $0.50/GB ingested | — | ~$0.02 | ~$0.50 |
+| AWS Cloud9 (t3.small) | Auto-stops after 30min idle | $0.0208/hr (only when active) | $0.021 | ~$0.08 | ~$2.50 |
+| AWS CodePipeline | 2 pipelines (1 free in free tier) | $1.00/pipeline/month | — | $0.03 | $1.00 |
+| AWS CodeDeploy | ECS blue/green deployments | Free for ECS | $0.00 | $0.00 | $0.00 |
+| AWS CodeCommit | 1 repo (free tier: 5 users) | Free | $0.00 | $0.00 | $0.00 |
+| **TOTAL (all running)** | | | **$0.089** | **$1.79** | **$53.51** |
+| **TOTAL (ECS stopped, RDS stopped)** | | | **$0.027** | **$0.64** | — |
 
 > **⚠️ CRITICAL**: Do NOT create a NAT Gateway (~$1.08/day = $32/month). Use public subnets with `assignPublicIp: ENABLED` for ECS tasks.
 
@@ -1084,14 +1087,17 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 
 ### Recommended Budget Timeline
 
-| Phase | Days | Daily Cost | Total |
-|---|---|---|---|
-| Setup & Development (Cloud9) | 3 days | ~$0.50 | $1.50 |
-| Deployment & Testing (all services running) | 5 days | ~$1.57 | $7.85 |
-| Demo Day (everything running) | 1 day | ~$1.57 | $1.57 |
-| Buffer | — | — | $10 |
-| **TOTAL ESTIMATED** | | | **~$21** |
-| **Remaining Safety Margin** | | | **~$29** |
+> **Key insight**: ALB charges ~$0.64/day even when ECS is stopped. Only delete ALB if budget is critical.
+
+| Phase | What's Running | Days | Daily Cost | Total |
+|---|---|---|---|---|
+| **Setup** (Cloud9 + RDS only) | Cloud9, RDS | 2 days | ~$0.49 | $0.98 |
+| **Deploy & Test** (all services) | RDS, 2×ECS, ALB, Cloud9 | 5 days | ~$1.79 | $8.95 |
+| **Idle** (ALB + stopped services) | ALB only (ECS=0, RDS stopped) | 10 days | ~$0.64 | $6.40 |
+| **Demo Day** (everything running) | All services | 1 day | ~$1.79 | $1.79 |
+| **Buffer for unexpected costs** | — | — | — | $10.00 |
+| **TOTAL ESTIMATED** | | | | **~$28** |
+| **Remaining from $50** | | | | **~$22** |
 
 ---
 
