@@ -16,13 +16,16 @@
     font-style: italic;
     margin-bottom: 30px;
     border-radius: 4px;
+    width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
   }
   .diagram-title span { color: #ff9900; }
   
   .canvas {
     position: relative;
     width: 1200px;
-    min-height: 900px;
+    min-height: 1100px;
     margin: 0 auto;
   }
   
@@ -147,15 +150,15 @@
 <div class="canvas">
 
   <!-- Cloud boundary -->
-  <div class="cloud-boundary" style="top:80px; left:200px; width:960px; height:780px;">
+  <div class="cloud-boundary" style="top:80px; left:200px; width:960px; height:960px;">
     <div class="cloud-label">AWS Cloud (us-east-1)</div>
   </div>
 
   <!-- TIER LABELS -->
   <div class="tier tier-web" style="top:95px; left:1040px;">Web Tier</div>
-  <div class="tier tier-app" style="top:330px; left:1040px;">App Tier</div>
-  <div class="tier tier-data" style="top:580px; left:1040px;">Data Tier</div>
-  <div class="tier tier-cicd" style="top:720px; left:1040px;">CI/CD Tier</div>
+  <div class="tier tier-app" style="top:350px; left:1040px;">App Tier</div>
+  <div class="tier tier-data" style="top:700px; left:1040px;">Data Tier</div>
+  <div class="tier tier-cicd" style="top:890px; left:1040px;">CI/CD Tier</div>
 
   <!-- ============ ROW 1: CLIENT + ALB ============ -->
   
@@ -175,7 +178,7 @@
   </div>
 
   <!-- ALB routing rules -->
-  <div class="features" style="top:195px; left:370px; min-width:220px;">
+  <div class="features" style="top:200px; left:370px; min-width:220px;">
     <div class="ftitle">ALB Listener Rules</div>
     <ul>
       <li>Path: /* --&gt; Shop Service TG</li>
@@ -187,12 +190,12 @@
   <!-- ============ ROW 2: ECS SERVICES ============ -->
 
   <!-- ECS Cluster box -->
-  <div class="section-box" style="top:310px; left:230px; width:730px; height:230px;">
+  <div class="section-box" style="top:320px; left:230px; width:730px; height:310px;">
     <div class="sec-label">Amazon ECS Cluster (Fargate) - b2b-marketplace</div>
   </div>
 
   <!-- Shop Service -->
-  <div class="svc" style="top:340px; left:260px; background:#e8f5e9; border:2px solid #2e7d32; min-width:160px;">
+  <div class="svc" style="top:350px; left:260px; background:#e8f5e9; border:2px solid #2e7d32; min-width:160px;">
     <span class="icon" style="color:#2e7d32;">&#9881;</span>
     <span class="name">Shop Service</span>
     <span class="sub">ECS Task (Fargate)</span>
@@ -200,7 +203,7 @@
   </div>
 
   <!-- Shop features -->
-  <div class="features" style="top:350px; left:450px;">
+  <div class="features" style="top:345px; left:460px;">
     <div class="ftitle">Shop Service Functions</div>
     <ul>
       <li>GET /products - Browse catalog</li>
@@ -213,7 +216,7 @@
   </div>
 
   <!-- Supplier Service -->
-  <div class="svc" style="top:450px; left:260px; background:#e3f2fd; border:2px solid #1565c0; min-width:160px;">
+  <div class="svc" style="top:500px; left:260px; background:#e3f2fd; border:2px solid #1565c0; min-width:160px;">
     <span class="icon" style="color:#1565c0;">&#9881;</span>
     <span class="name">Supplier Service</span>
     <span class="sub">ECS Task (Fargate)</span>
@@ -221,7 +224,7 @@
   </div>
 
   <!-- Supplier features -->
-  <div class="features" style="top:440px; left:450px; min-width: 220px;">
+  <div class="features" style="top:495px; left:460px; min-width: 220px;">
     <div class="ftitle">Supplier Service Functions</div>
     <ul>
       <li>CRUD /admin/products - Manage inventory</li>
@@ -234,7 +237,7 @@
   </div>
 
   <!-- ECR -->
-  <div class="svc" style="top:370px; left:800px; background:#fff3e0; border:2px solid #e65100; min-width:120px;">
+  <div class="svc" style="top:420px; left:800px; background:#fff3e0; border:2px solid #e65100; min-width:120px;">
     <span class="icon" style="color:#e65100;">&#128230;</span>
     <span class="name">Amazon ECR</span>
     <span class="sub">Docker Registry</span>
@@ -242,10 +245,10 @@
     <span class="sub">supplier:latest</span>
   </div>
 
-  <!-- ============ ROW 3: DATABASE ============ -->
+  <!-- ============ ROW 3: DATABASE + MONITORING ============ -->
 
   <!-- RDS -->
-  <div class="svc" style="top:580px; left:400px; background:#e8eaf6; border:2px solid #283593; min-width:160px;">
+  <div class="svc" style="top:700px; left:400px; background:#e8eaf6; border:2px solid #283593; min-width:160px;">
     <span class="icon" style="color:#283593;">&#128451;</span>
     <span class="name">Amazon RDS</span>
     <span class="sub">MySQL 8.0 | db.t3.micro</span>
@@ -254,7 +257,7 @@
   </div>
 
   <!-- DB Schema -->
-  <div class="features" style="top:570px; left:600px; min-width:200px;">
+  <div class="features" style="top:690px; left:610px; min-width:200px;">
     <div class="ftitle">Database Tables</div>
     <ul>
       <li>users (shop, supplier, admin)</li>
@@ -264,31 +267,39 @@
     </ul>
   </div>
 
+  <!-- CloudWatch -->
+  <div class="svc" style="top:700px; left:230px; background:#f3e5f5; border:2px solid #6a1b9a; min-width:130px;">
+    <span class="icon" style="color:#6a1b9a;">&#128200;</span>
+    <span class="name">CloudWatch Logs</span>
+    <span class="sub">/ecs/shop</span>
+    <span class="sub">/ecs/supplier</span>
+  </div>
+
   <!-- ============ ROW 4: CI/CD ============ -->
 
   <!-- CI/CD Section -->
-  <div class="section-box" style="top:700px; left:230px; width:730px; height:140px;">
-    <div class="sec-label">CI/CD Pipeline (AWS CodePipeline)</div>
+  <div class="section-box" style="top:870px; left:230px; width:730px; height:140px;">
+    <div class="sec-label">CI/CD Pipeline (AWS CodePipeline - Skip Build Stage)</div>
   </div>
 
-  <!-- CodeCommit -->
-  <div class="svc" style="top:730px; left:250px; background:#fce4ec; border:2px solid #c62828; min-width:110px;">
-    <span class="icon" style="color:#c62828;">&#128193;</span>
-    <span class="name">CodeCommit</span>
+  <!-- Cloud9 -->
+  <div class="svc" style="top:900px; left:250px; background:#e8f5e9; border:2px solid #2e7d32; min-width:120px;">
+    <span class="icon" style="color:#2e7d32;">&#9729;</span>
+    <span class="name">Cloud9 IDE</span>
+    <span class="sub">Manual Build</span>
+    <span class="sub">docker build + ECR push</span>
+  </div>
+
+  <!-- ECR Source -->
+  <div class="svc" style="top:900px; left:440px; background:#fff3e0; border:2px solid #e65100; min-width:120px;">
+    <span class="icon" style="color:#e65100;">&#128230;</span>
+    <span class="name">ECR (Source)</span>
     <span class="sub">Source Stage</span>
-    <span class="sub">Git push trigger</span>
-  </div>
-
-  <!-- CodeBuild -->
-  <div class="svc" style="top:730px; left:430px; background:#fff8e1; border:2px solid #f57f17; min-width:110px;">
-    <span class="icon" style="color:#f57f17;">&#128295;</span>
-    <span class="name">CodeBuild</span>
-    <span class="sub">Build Stage</span>
-    <span class="sub">Docker build + ECR push</span>
+    <span class="sub">Image push trigger</span>
   </div>
 
   <!-- CodeDeploy -->
-  <div class="svc" style="top:730px; left:620px; background:#e0f7fa; border:2px solid #00838f; min-width:110px;">
+  <div class="svc" style="top:900px; left:630px; background:#e0f7fa; border:2px solid #00838f; min-width:120px;">
     <span class="icon" style="color:#00838f;">&#128640;</span>
     <span class="name">CodeDeploy</span>
     <span class="sub">Deploy Stage</span>
@@ -296,23 +307,15 @@
   </div>
 
   <!-- Deploy target -->
-  <div class="svc" style="top:730px; left:800px; background:#f3e5f5; border:2px solid #6a1b9a; min-width:110px;">
+  <div class="svc" style="top:900px; left:810px; background:#f3e5f5; border:2px solid #6a1b9a; min-width:110px;">
     <span class="icon" style="color:#6a1b9a;">&#9654;</span>
     <span class="name">ECS Service</span>
-    <span class="sub">Rolling Update</span>
+    <span class="sub">Blue/Green Deploy</span>
     <span class="sub">Zero-downtime</span>
   </div>
 
-  <!-- CloudWatch -->
-  <div class="svc" style="top:580px; left:230px; background:#f3e5f5; border:2px solid #6a1b9a; min-width:130px;">
-    <span class="icon" style="color:#6a1b9a;">&#128200;</span>
-    <span class="name">CloudWatch Logs</span>
-    <span class="sub">/ecs/shop</span>
-    <span class="sub">/ecs/supplier</span>
-  </div>
-
   <!-- ARROWS SVG -->
-  <svg class="arrows" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <svg class="arrows" viewBox="0 0 1200 1100" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
@@ -323,6 +326,9 @@
       <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="#c62828"/>
       </marker>
+      <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#2e7d32"/>
+      </marker>
     </defs>
 
     <!-- Browser to ALB -->
@@ -330,38 +336,38 @@
     <text x="250" y="140" class="arrow-label" fill="#ff9900" font-weight="bold">HTTP Request</text>
 
     <!-- ALB to Shop -->
-    <line x1="440" y1="180" x2="340" y2="340" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
-    <text x="350" y="270" class="arrow-label">Path: /*</text>
+    <line x1="440" y1="185" x2="340" y2="350" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="350" y="275" class="arrow-label">Path: /*</text>
 
     <!-- ALB to Supplier -->
-    <line x1="480" y1="180" x2="340" y2="450" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
-    <text x="425" y="320" class="arrow-label">Path: /admin/*</text>
+    <line x1="480" y1="185" x2="340" y2="500" marker-end="url(#arrowhead)" stroke-dasharray="6,3"/>
+    <text x="430" y="350" class="arrow-label">Path: /admin/*</text>
 
     <!-- Shop to RDS -->
-    <line x1="340" y1="410" x2="440" y2="580" marker-end="url(#arrowhead)" stroke="#283593"/>
-    <text x="340" y="510" class="arrow-label" fill="#283593">MySQL queries</text>
+    <line x1="340" y1="430" x2="440" y2="700" marker-end="url(#arrowhead)" stroke="#283593"/>
+    <text x="340" y="580" class="arrow-label" fill="#283593">MySQL queries</text>
 
     <!-- Supplier to RDS -->
-    <line x1="340" y1="510" x2="440" y2="580" marker-end="url(#arrowhead)" stroke="#283593"/>
+    <line x1="340" y1="575" x2="440" y2="700" marker-end="url(#arrowhead)" stroke="#283593"/>
 
     <!-- Shop to CloudWatch -->
-    <line x1="300" y1="410" x2="295" y2="580" marker-end="url(#arrowhead)" stroke="#6a1b9a" stroke-dasharray="4,3"/>
+    <line x1="300" y1="430" x2="295" y2="700" marker-end="url(#arrowhead)" stroke="#6a1b9a" stroke-dasharray="4,3"/>
     
     <!-- Supplier to CloudWatch -->
-    <line x1="290" y1="510" x2="290" y2="580" marker-end="url(#arrowhead)" stroke="#6a1b9a" stroke-dasharray="4,3"/>
+    <line x1="290" y1="575" x2="290" y2="700" marker-end="url(#arrowhead)" stroke="#6a1b9a" stroke-dasharray="4,3"/>
 
     <!-- ECR to ECS (pull) -->
-    <line x1="800" y1="430" x2="430" y2="400" marker-end="url(#arrowhead)" stroke="#e65100" stroke-dasharray="4,3"/>
-    <text x="600" y="395" class="arrow-label" fill="#e65100">Image Pull</text>
+    <line x1="800" y1="480" x2="430" y2="440" marker-end="url(#arrowhead)" stroke="#e65100" stroke-dasharray="4,3"/>
+    <text x="600" y="440" class="arrow-label" fill="#e65100">Image Pull</text>
 
     <!-- CI/CD flow arrows -->
-    <line x1="370" y1="765" x2="425" y2="765" marker-end="url(#arrowhead-red)" stroke="#c62828" stroke-width="3"/>
-    <line x1="555" y1="765" x2="615" y2="765" marker-end="url(#arrowhead-red)" stroke="#c62828" stroke-width="3"/>
-    <line x1="745" y1="765" x2="795" y2="765" marker-end="url(#arrowhead-red)" stroke="#c62828" stroke-width="3"/>
+    <line x1="380" y1="935" x2="435" y2="935" marker-end="url(#arrowhead-green)" stroke="#2e7d32" stroke-width="3"/>
+    <line x1="570" y1="935" x2="625" y2="935" marker-end="url(#arrowhead-red)" stroke="#c62828" stroke-width="3"/>
+    <line x1="760" y1="935" x2="805" y2="935" marker-end="url(#arrowhead-red)" stroke="#c62828" stroke-width="3"/>
 
-    <!-- CodeBuild to ECR -->
-    <line x1="510" y1="730" x2="830" y2="440" marker-end="url(#arrowhead)" stroke="#e65100" stroke-dasharray="4,3"/>
-    <text x="660" y="570" class="arrow-label" fill="#e65100">Push Image</text>
+    <!-- Cloud9 to ECR (push image) -->
+    <line x1="340" y1="900" x2="830" y2="490" marker-end="url(#arrowhead)" stroke="#e65100" stroke-dasharray="4,3"/>
+    <text x="550" y="680" class="arrow-label" fill="#e65100">Push Image</text>
   </svg>
 
 </div>
