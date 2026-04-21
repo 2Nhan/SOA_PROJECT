@@ -74,8 +74,9 @@ Key design decisions:
                                        +-------------+
 
     +--------------------------------------------------+
-    | CI/CD Pipeline                                    |
-    | CodeCommit --> CodeBuild --> CodeDeploy --> ECS    |
+    | CI/CD Pipeline (No CodeBuild - Learner Lab)       |
+    | ECR Image Push --> CodePipeline --> CodeDeploy     |
+    |                                --> ECS Blue/Green  |
     +--------------------------------------------------+
 
     +--------------------------------------------------+
@@ -202,54 +203,58 @@ Step 8: ORDER COMPLETE
 
 ## CI/CD Pipeline
 
-The project uses AWS developer tools to implement a continuous integration and continuous deployment pipeline.
+The project uses AWS developer tools to implement a continuous deployment pipeline. **CodeBuild is not available in AWS Academy Learner Lab**, so Docker images are built and pushed to ECR manually from Cloud9. The pipeline is triggered automatically when a new image is pushed to ECR.
 
 ### Pipeline Stages
 
 ```
-Stage 1: SOURCE
-  Trigger: Code push to CodeCommit repository (main branch)
-  Output: Source code artifact
+Stage 1: MANUAL BUILD (Cloud9 / Local)
+  Developer builds Docker image and pushes to Amazon ECR
+  Trigger: Manual docker push to ECR repository
       |
       v
-Stage 2: BUILD (CodeBuild)
-  Environment: Amazon Linux 2, Docker runtime
-  Process:
-    1. Authenticate to Amazon ECR
-    2. Build Docker image from Dockerfile
-    3. Tag image with commit hash
-    4. Push image to ECR repository
-    5. Generate image definitions artifact
-  Config: buildspec.yml in each microservice directory
+Stage 2: SOURCE (CodePipeline)
+  Trigger: New image detected in ECR repository (tag: latest)
+  Output: Source artifact with image URI
       |
       v
-Stage 3: DEPLOY (CodeDeploy to ECS)
+Stage 3: DEPLOY (CodeDeploy → ECS Blue/Green)
   Strategy: Blue/Green deployment
   Process:
-    1. Register new ECS task definition with updated image
-    2. Create new task set (green) in ECS service
-    3. Route ALB traffic to new task set
-    4. Terminate old task set (blue)
+    1. Register new ECS task definition with updated image URI
+    2. Create new task set (green) in standby target group
+    3. Health check passes → ALB traffic switches to new tasks
+    4. Old task set (blue) terminated after 5 minutes
   Config: appspec-*.yaml + taskdef-*.json in deployment/
 ```
+
+> **Why no CodeBuild?** AWS Academy Learner Lab does not include CodeBuild in its allowed services list. The reference lab ("Building Microservices and a CI/CD Pipeline with AWS") explicitly uses **"Skip build stage"** when creating CodePipeline. Images are built on Cloud9 and pushed directly to ECR.
 
 ### Pipeline Configuration Files
 
 | File | Purpose |
 |---|---|
-| `microservices/shop/buildspec.yml` | CodeBuild instructions for Shop service |
-| `microservices/supplier/buildspec.yml` | CodeBuild instructions for Supplier service |
 | `deployment/appspec-shop.yaml` | CodeDeploy ECS deployment spec for Shop |
 | `deployment/appspec-supplier.yaml` | CodeDeploy ECS deployment spec for Supplier |
-| `deployment/taskdef-shop.json` | ECS task definition for Shop |
-| `deployment/taskdef-supplier.json` | ECS task definition for Supplier |
+| `deployment/taskdef-shop.json` | ECS task definition for Shop (image placeholder: `<IMAGE1_NAME>`) |
+| `deployment/taskdef-supplier.json` | ECS task definition for Supplier (image placeholder: `<IMAGE1_NAME>`) |
+| `deployment/create-shop-microservice-tg-two.json` | ECS service config with CODE_DEPLOY controller |
+| `deployment/create-supplier-microservice-tg-two.json` | ECS service config with CODE_DEPLOY controller |
 
-### Required Environment Variables in CodeBuild
+### Build and Deploy Workflow
 
-| Variable | Description |
-|---|---|
-| `AWS_ACCOUNT_ID` | AWS account ID for ECR URI construction |
-| `AWS_DEFAULT_REGION` | Deployment region (us-east-1) |
+```bash
+# 1. Build Docker image locally or on Cloud9
+cd microservices/shop
+docker build -t shop .
+
+# 2. Tag and push to ECR
+account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
+docker tag shop:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
+docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
+
+# 3. CodePipeline detects ECR update → triggers CodeDeploy → blue/green ECS deployment
+```
 
 ---
 
@@ -265,7 +270,7 @@ Stage 3: DEPLOY (CodeDeploy to ECS)
 | Amazon RDS | Managed MySQL database | db.t3.micro, MySQL 8.0, Single-AZ, 20GB gp2 |
 | Amazon S3 | Product image storage | Public-read bucket for product photos |
 | AWS CodeCommit | Source code repository | Main branch triggers pipeline |
-| AWS CodeBuild | Docker image builds | Managed build environment with Docker |
+| AWS Cloud9 | Development environment | IDE for building Docker images and pushing to ECR |
 | AWS CodeDeploy | ECS blue/green deployments | Automated traffic shifting |
 | AWS CodePipeline | Pipeline orchestration | Source -> Build -> Deploy |
 | Amazon CloudWatch | Logging and monitoring | Log groups: /ecs/shop, /ecs/supplier |
@@ -600,7 +605,7 @@ docker-compose down -v       # Stop services, delete database volume
 | Containerization | Docker |
 | Orchestration | Amazon ECS on Fargate |
 | Load Balancing | AWS Application Load Balancer |
-| CI/CD | AWS CodePipeline + CodeBuild + CodeDeploy |
+| CI/CD | AWS CodePipeline + CodeDeploy (Blue/Green, no CodeBuild) |
 | Image Registry | Amazon ECR |
 | Database Hosting | Amazon RDS |
 | Monitoring | Amazon CloudWatch Logs |
