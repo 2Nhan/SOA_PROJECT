@@ -20,6 +20,10 @@ exports.login = (req, res) => {
       return res.render("login", { error: "Login failed" });
     }
     req.session.user = user;
+    // Role-based redirect: supplier/admin → supplier panel, shop → shop home
+    if (user.role === "supplier" || user.role === "admin") {
+      return res.redirect("/admin/");
+    }
     res.redirect("/");
   });
 };
@@ -33,6 +37,8 @@ exports.register = (req, res) => {
   const full_name = (req.body.full_name || "").trim().replace(/<[^>]*>/g, "");
   const password = req.body.password || "";
   const confirm_password = req.body.confirm_password || "";
+  // Only allow shop or supplier; admin cannot self-register
+  const role = req.body.role === "supplier" ? "supplier" : "shop";
 
   if (!email || !full_name || !password) {
     return res.render("register", { error: "All fields are required" });
@@ -44,7 +50,7 @@ exports.register = (req, res) => {
     return res.render("register", { error: "Passwords do not match" });
   }
 
-  Auth.register({ email, full_name, password, role: "shop" }, (err, user) => {
+  Auth.register({ email, full_name, password, role }, (err, user) => {
     if (err) {
       if (err.kind === "duplicate") return res.render("register", { error: "Email already registered" });
       return res.render("register", { error: "Registration failed" });

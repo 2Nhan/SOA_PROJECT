@@ -1,65 +1,65 @@
 const Auth = require("../models/auth.model");
 
+// Redirect to unified login on shop service
 exports.loginForm = (req, res) => {
-  res.render("login", { error: null });
+  res.redirect("/login");
 };
 
+// Keep POST handler as fallback (in case form is submitted directly)
 exports.login = (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
   const password = req.body.password || "";
 
   if (!email || !password) {
-    return res.render("login", { error: "Email and password are required" });
+    return res.redirect("/login");
   }
 
   Auth.login(email, password, (err, user) => {
     if (err) {
-      if (err.kind === "not_found") return res.render("login", { error: "Email not found" });
-      if (err.kind === "wrong_password") return res.render("login", { error: "Incorrect password" });
-      if (err.kind === "not_approved") return res.render("login", { error: "Your account is " + err.status + ". Please wait for admin approval." });
-      return res.render("login", { error: "Login failed" });
+      return res.redirect("/login");
     }
     if (user.role !== "supplier" && user.role !== "admin") {
-      return res.render("login", { error: "Access denied. Supplier or Admin account required." });
+      return res.redirect("/login");
     }
     req.session.user = user;
     res.redirect("/admin/");
   });
 };
 
+// Redirect to unified register on shop service
 exports.registerForm = (req, res) => {
-  res.render("register", { error: null });
+  res.redirect("/register");
 };
 
+// Keep POST handler as fallback
 exports.register = (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase().replace(/<[^>]*>/g, "");
   const full_name = (req.body.full_name || "").trim().replace(/<[^>]*>/g, "");
   const password = req.body.password || "";
   const confirm_password = req.body.confirm_password || "";
-  const role = req.body.role === "admin" ? "admin" : "supplier";
+  const role = req.body.role === "supplier" ? "supplier" : "shop";
 
   if (!email || !full_name || !password) {
-    return res.render("register", { error: "All fields are required" });
+    return res.redirect("/register");
   }
   if (password.length < 6) {
-    return res.render("register", { error: "Password must be at least 6 characters" });
+    return res.redirect("/register");
   }
   if (password !== confirm_password) {
-    return res.render("register", { error: "Passwords do not match" });
+    return res.redirect("/register");
   }
 
   Auth.register({ email, full_name, password, role }, (err, user) => {
     if (err) {
-      if (err.kind === "duplicate") return res.render("register", { error: "Email already registered" });
-      return res.render("register", { error: "Registration failed" });
+      return res.redirect("/register");
     }
-    res.render("login", { error: "Registration successful! Please wait for admin approval before logging in." });
+    res.redirect("/login");
   });
 };
 
 exports.logout = (req, res) => {
   req.session.destroy(() => {
-    res.redirect("/admin/login");
+    res.redirect("/login");
   });
 };
 

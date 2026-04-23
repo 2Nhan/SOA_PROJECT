@@ -6,6 +6,8 @@ const compression = require("compression");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session");
+const MySQLStore = require("express-mysql-session")(session);
+const dbConfig = require("./app/config/config");
 
 const app = express();
 
@@ -55,10 +57,22 @@ app.use(express.json({ limit: "10mb" }));
 
 app.set("trust proxy", 1);
 
-// --------------- SESSION ---------------
+// --------------- SESSION (shared MySQL store) ---------------
+
+const sessionStore = new MySQLStore({
+  host: dbConfig.HOST,
+  port: dbConfig.PORT,
+  user: dbConfig.USER,
+  password: dbConfig.PASSWORD,
+  database: dbConfig.DB,
+  createDatabaseTable: true,
+  schema: { tableName: "sessions" }
+});
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || "b2b-supplier-secret-key-change-in-production",
+  key: "b2b_session",
+  secret: process.env.SESSION_SECRET || "b2b-shared-secret-key-change-in-production",
+  store: sessionStore,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -89,14 +103,17 @@ app.get("/health", (req, res) => {
 
 function requireAuth(req, res, next) {
   if (!req.session.user) {
-    return res.redirect("/admin/login");
+    return res.redirect("/login");
+  }
+  if (req.session.user.role !== "supplier" && req.session.user.role !== "admin") {
+    return res.status(403).render("error", { message: "Access denied. Supplier or Admin account required." });
   }
   next();
 }
 
 function requireAdmin(req, res, next) {
   if (!req.session.user) {
-    return res.redirect("/admin/login");
+    return res.redirect("/login");
   }
   if (req.session.user.role !== "admin") {
     return res.status(403).render("error", { message: "Access denied. Admin role required." });
