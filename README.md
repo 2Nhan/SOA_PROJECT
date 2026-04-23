@@ -68,15 +68,14 @@ Key design decisions:
                     +---v--------v--+    |
                     | Amazon RDS    |    |
                     | MySQL 8.0     |    v
-                    | (db.t3.micro) |  +-------------+
+                    | (db.c6gd.med) |  +-------------+
                     +---------------+  | Amazon S3   |
                                        | (Images)    |
                                        +-------------+
 
     +--------------------------------------------------+
-    | CI/CD Pipeline (No CodeBuild - Learner Lab)       |
-    | ECR Image Push --> CodePipeline --> CodeDeploy     |
-    |                                --> ECS Blue/Green  |
+    | CI/CD (No CodeBuild/CodePipeline - Learner Lab)   |
+    | ECR Image Push --> CLI CodeDeploy --> ECS Blue/Green|
     +--------------------------------------------------+
 
     +--------------------------------------------------+
@@ -213,12 +212,8 @@ Stage 1: MANUAL BUILD (Cloud9 / Local)
   Trigger: Manual docker push to ECR repository
       |
       v
-Stage 2: SOURCE (CodePipeline)
-  Trigger: New image detected in ECR repository (tag: latest)
-  Output: Source artifact with image URI
-      |
-      v
-Stage 3: DEPLOY (CodeDeploy → ECS Blue/Green)
+Stage 2: DEPLOY (CLI → CodeDeploy → ECS Blue/Green)
+  Trigger: Manual CLI command (aws deploy create-deployment)
   Strategy: Blue/Green deployment
   Process:
     1. Register new ECS task definition with updated image URI
@@ -228,7 +223,7 @@ Stage 3: DEPLOY (CodeDeploy → ECS Blue/Green)
   Config: appspec-*.yaml + taskdef-*.json in deployment/
 ```
 
-> **Why no CodeBuild?** AWS Academy Learner Lab does not include CodeBuild in its allowed services list. The reference lab ("Building Microservices and a CI/CD Pipeline with AWS") explicitly uses **"Skip build stage"** when creating CodePipeline. Images are built on Cloud9 and pushed directly to ECR.
+> **Why no CodeBuild or CodePipeline?** AWS Academy Learner Lab does not include CodeBuild or CodePipeline in its allowed services. Images are built on Cloud9 and pushed directly to ECR. CodeDeploy blue/green deployments are triggered manually via AWS CLI.
 
 ### Pipeline Configuration Files
 
@@ -253,7 +248,11 @@ account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
 docker tag shop:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 
-# 3. CodePipeline detects ECR update → triggers CodeDeploy → blue/green ECS deployment
+# 3. Trigger CodeDeploy blue/green deployment via CLI
+aws deploy create-deployment \
+  --application-name b2b-marketplace \
+  --deployment-group-name shop-deployment-group \
+  --revision '{"revisionType":"AppSpecContent","appSpecContent":{"content":"{...}"}}'
 ```
 
 ---
@@ -267,12 +266,12 @@ docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 | Amazon ECS (Fargate) | Container orchestration | 2 services, 1 task each, 0.25 vCPU / 512MB RAM |
 | Amazon ECR | Docker image registry | 2 private repositories (shop, supplier) |
 | Application Load Balancer | Traffic routing & health checks | Path-based routing (`/admin/*` → Supplier, default → Shop), 4 target groups for blue/green |
-| Amazon RDS (MySQL 8.0) | Managed database | db.t3.micro, Single-AZ, 20GB gp2 |
+| Amazon RDS (MySQL 8.0) | Managed database | db.c6gd.medium, Single-AZ, 20GB gp3 |
 | Amazon S3 | Product image storage | Public-read bucket for supplier product photos |
 | AWS Cloud9 | Development environment | t3.small, Amazon Linux 2, for Docker builds and ECR pushes |
 | AWS CodeCommit | Source code repository | Stores project code, main branch |
 | AWS CodeDeploy | ECS blue/green deployments | 2 deployment groups, 4 target groups, auto-rollback on failure |
-| AWS CodePipeline | Pipeline orchestration | Source (ECR) → Deploy (CodeDeploy), skip build stage |
+| ~~AWS CodePipeline~~ | ~~Pipeline orchestration~~ | Not available in Learner Lab — CodeDeploy triggered via CLI |
 | Amazon CloudWatch | Logging and monitoring | Log groups: `/ecs/shop`, `/ecs/supplier`, CPU/memory alarms |
 
 ### Network Configuration
@@ -294,9 +293,9 @@ The project uses the pre-configured `LabRole` provided by AWS Academy Learner La
 |---|---|---|
 | ECS Task Execution Role | `LabRole` | Pull images from ECR, push logs to CloudWatch |
 | ECS Task Role | `LabRole` | Runtime permissions: access RDS, S3, CloudWatch |
-| CodeBuild Service Role | `LabRole` | Access ECR, S3, CloudWatch during builds |
+| ~~CodeBuild Service Role~~ | ~~`LabRole`~~ | ~~Not available in Learner Lab~~ |
 | CodeDeploy Service Role | `LabRole` | Manage ECS deployments, ALB target groups |
-| CodePipeline Service Role | `LabRole` | Orchestrate pipeline stages, access artifacts in S3 |
+| ~~CodePipeline Service Role~~ | ~~`LabRole`~~ | ~~Not available in Learner Lab~~ |
 | RDS Management | `LabRole` | Database instance management |
 
 ### Permission Boundaries
@@ -605,7 +604,7 @@ docker-compose down -v       # Stop services, delete database volume
 | Containerization | Docker |
 | Orchestration | Amazon ECS on Fargate |
 | Load Balancing | AWS Application Load Balancer |
-| CI/CD | AWS CodePipeline + CodeDeploy (Blue/Green, no CodeBuild) |
+| CI/CD | AWS CodeDeploy (Blue/Green via CLI, no CodeBuild/CodePipeline) |
 | Image Registry | Amazon ECR |
 | Database Hosting | Amazon RDS |
 | Monitoring | Amazon CloudWatch Logs |

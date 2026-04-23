@@ -10,8 +10,8 @@
 - [Phase 6: Creating the Database (Amazon RDS)](#phase-6-creating-the-database-amazon-rds)
 - [Phase 7: Creating Target Groups and an Application Load Balancer](#phase-7-creating-target-groups-and-an-application-load-balancer)
 - [Phase 8: Creating Two Amazon ECS Services](#phase-8-creating-two-amazon-ecs-services)
-- [Phase 9: Configuring CodeDeploy and CodePipeline (No CodeBuild)](#phase-9-configuring-codedeploy-and-codepipeline-no-codebuild)
-- [Phase 10: Testing the CI/CD Pipeline](#phase-10-testing-the-cicd-pipeline)
+- [Phase 9: Configuring CodeDeploy (Blue/Green Deployment)](#phase-9-configuring-codedeploy-blue-green-deployment)
+- [Phase 10: Testing the CI/CD Deployment](#phase-10-testing-the-cicd-deployment)
 - [Phase 11: Setting Up CloudWatch Monitoring](#phase-11-setting-up-cloudwatch-monitoring)
 - [IAM Roles and Permissions (Learner Lab)](#iam-roles-and-permissions-learner-lab)
 - [Security Architecture](#security-architecture)
@@ -27,22 +27,24 @@
 
 Open `docs/architecture-diagram.html` in a browser to view the system architecture. The diagram illustrates:
 
-- **Networking (VPC)**: LabVPC with Public Subnet 1 and Public Subnet 2
-- **Database (Amazon RDS)**: MySQL 8.0 instance (`db.t3.micro`) within the LabVPC
+- **Networking (VPC)**: VPC with 2 public subnets (use LabVPC if available, otherwise default VPC)
+- **Database (Amazon RDS)**: MySQL 8.0 instance (`db.c6gd.medium`) within the VPC
 - **User Access**: Application Load Balancer (ALB) receives requests on HTTP:80 and routes traffic
 - **Compute (Amazon ECS/Fargate)**: ECS Cluster running Tasks for the Shop Microservice and Supplier Microservice
 - **Storage (Amazon S3)**: Bucket for product images uploaded by suppliers
-- **CI/CD**: AWS CodePipeline workflow (Source → Deploy, no build stage) triggered by Amazon ECR image updates, using CodeDeploy for blue/green ECS deployments
+- **CI/CD**: CodeDeploy blue/green ECS deployments, triggered manually via CLI (CodePipeline not available in Learner Lab)
 - **Monitoring**: Amazon CloudWatch for container logs and metrics
 - **Development Environment**: AWS Cloud9 IDE
 
 ### Task 1.2: Develop a Cost Estimate
 
-Access the [AWS Pricing Calculator](https://calculator.aws/). Select Region: **US East (N. Virginia) (us-east-1)**. Add services and assume an operational time of **1 month** (Learner Lab budget):
+> **⚠️ Learner Lab Note**: AWS Pricing Calculator may not be accessible due to permission restrictions in Learner Lab. **Alternative**: Use the cost table below as your reference estimate. You can also create a **manual cost spreadsheet** (Excel/Google Sheets) using the pricing details from the [AWS Pricing pages](https://aws.amazon.com/pricing/) for each service — this achieves the same learning objective of understanding cloud cost estimation.
+
+Access the [AWS Pricing Calculator](https://calculator.aws/) if available. Otherwise, use the table below. Select Region: **US East (N. Virginia) (us-east-1)**. Assume an operational time of **1 month** (Learner Lab budget):
 
 | Service | Configuration | Pricing Detail | Cost/Hour | Cost/Day | Cost/Month |
 |---|---|---|---|---|---|
-| Amazon RDS (MySQL) | db.t3.micro, 20GB gp2, Single-AZ | $0.017/hr | $0.017 | $0.41 | $12.24 |
+| Amazon RDS (MySQL) | db.c6gd.medium, 20GB gp3, Single-AZ | ~$0.068/hr | $0.068 | $1.63 | $48.96 |
 | Amazon ECS (Fargate) — Shop | 0.25 vCPU, 0.5GB RAM | vCPU: $0.04048/hr, Mem: $0.004445/GB/hr | $0.012 | $0.30 | $8.89 |
 | Amazon ECS (Fargate) — Supplier | 0.25 vCPU, 0.5GB RAM | Same as above | $0.012 | $0.30 | $8.89 |
 | Application Load Balancer | 1 ALB, ~0.5 LCU avg | $0.0225/hr + $0.008/LCU-hr | $0.027 | $0.64 | $19.44 |
@@ -50,11 +52,13 @@ Access the [AWS Pricing Calculator](https://calculator.aws/). Select Region: **U
 | Amazon ECR | ~400MB Docker images (2 repos) | $0.10/GB/month | — | ~$0.01 | ~$0.04 |
 | Amazon CloudWatch | Log storage (~1GB/month) | $0.50/GB ingested | — | ~$0.02 | ~$0.50 |
 | AWS Cloud9 (t3.small) | Auto-stops after 30min idle | $0.0208/hr (only when active) | $0.021 | ~$0.08 | ~$2.50 |
-| AWS CodePipeline | 2 pipelines (1 free in free tier) | $1.00/pipeline/month | — | $0.03 | $1.00 |
+| ~~AWS CodePipeline~~ | ~~2 pipelines~~ | Not available in Learner Lab | — | $0.00 | $0.00 |
 | AWS CodeDeploy | ECS blue/green deployments | Free for ECS | $0.00 | $0.00 | $0.00 |
 | AWS CodeCommit | 1 repo (free tier: 5 users) | Free | $0.00 | $0.00 | $0.00 |
-| **TOTAL (all running)** | | | **$0.089** | **$1.79** | **$53.51** |
+| **TOTAL (all running)** | | | **$0.140** | **$3.36** | **$100+** |
 | **TOTAL (ECS stopped, RDS stopped)** | | | **$0.027** | **$0.64** | — |
+
+> **⚠️ BUDGET WARNING**: `db.c6gd.medium` costs ~$0.068/hr (~$1.63/day) — significantly more than the ideal `db.t3.micro` ($0.017/hr). **Always stop RDS when not in use** and minimize active hours. With careful management (RDS running only ~4 hours/day), you can keep RDS costs under $10 for the project.
 
 > **⚠️ CRITICAL**: Do NOT create a NAT Gateway (~$1.08/day = $32/month). Use public subnets with `assignPublicIp: ENABLED` for ECS tasks.
 
@@ -73,8 +77,11 @@ Access the [AWS Pricing Calculator](https://calculator.aws/). Select Region: **U
    - **Platform**: Amazon Linux 2
    - **Network settings**:
      - Connection: Select **Secure Shell (SSH)**
-     - VPC: Select **LabVPC**
-     - Subnet: Select **Public Subnet 1**
+     - VPC: Select **LabVPC** (if available; otherwise use the default VPC)
+     - Subnet: Select **Public Subnet 1** (if available; otherwise select any public subnet with auto-assign public IP)
+
+> **⚠️ Learner Lab Note**: In some Learner Lab environments, **LabVPC** and **Public Subnet 1** may not exist. If they are not available, use the **default VPC** and any **public subnet** instead. The rest of the guide will work the same way — just select the correct VPC/subnets consistently across all resources (ALB, RDS, ECS, etc.).
+
 4. Select **Create** → Wait for environment to be ready → Select **Open**
 
 ### Task 2.2: Verify Docker and Git are available in Cloud9
@@ -106,6 +113,15 @@ sudo resize2fs /dev/xvda1
 
 ## Phase 3: Creating a CodeCommit Repository and Pushing Code
 
+### Task 3.0: Add SSH inbound rule for Cloud9 (if needed)
+
+If your Cloud9 environment uses SSH connection, ensure the Cloud9 EC2 instance's security group allows SSH:
+
+1. In the **Amazon EC2** console → **Security Groups** → Find the Cloud9 instance security group
+2. Select **Edit Inbound Rules** → **Add rule**:
+   - Type: **SSH (TCP 22)**, Source: **Anywhere (0.0.0.0/0)** (or your IP for tighter security)
+3. Select **Save rules**
+
 ### Task 3.1: Create an AWS CodeCommit repository
 
 1. Open the **AWS CodeCommit** console
@@ -116,22 +132,20 @@ sudo resize2fs /dev/xvda1
 
 ### Task 3.2: Clone the project code to Cloud9
 
-If you have the code on GitHub or locally, download and upload it to Cloud9:
+Clone the project code from GitHub to Cloud9:
 
 ```bash
-# Option A: Clone from GitHub (if project is on GitHub)
 cd ~/environment
-git clone https://github.com/<YOUR-USERNAME>/b2b-marketplace.git
-cd b2b-marketplace
-
-# Option B: Upload files manually to Cloud9
-# Use File → Upload Local Files in the Cloud9 menu
+git clone https://github.com/AsakiIchiwa/AWS_LAB.git
+cd AWS_LAB
 ```
+
+> **Note**: The cloned directory is `AWS_LAB`. All subsequent commands in this guide use `cd ~/environment/AWS_LAB` instead of `cd ~/environment/b2b-marketplace`.
 
 ### Task 3.3: Verify the project structure
 
 ```bash
-cd ~/environment/b2b-marketplace
+cd ~/environment/AWS_LAB
 ls -la
 ```
 
@@ -164,7 +178,7 @@ You should see:
 ### Task 3.4: Push the code to CodeCommit
 
 ```bash
-cd ~/environment/b2b-marketplace
+cd ~/environment/AWS_LAB
 
 # Initialize Git and commit
 git init
@@ -203,7 +217,7 @@ git config --global user.email "<your-email@example.com>"
 ### Task 4.2: Start a local MySQL database for testing
 
 ```bash
-cd ~/environment/b2b-marketplace
+cd ~/environment/AWS_LAB
 
 # Start only the MySQL container from docker-compose
 docker run -d \
@@ -225,7 +239,7 @@ docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/db
 ### Task 4.3: Build and test the Shop microservice
 
 ```bash
-cd ~/environment/b2b-marketplace/microservices/shop
+cd ~/environment/AWS_LAB/microservices/shop
 
 # Build the Docker image
 docker build --tag shop .
@@ -246,14 +260,16 @@ docker run -d --name shop_1 -p 8080:8080 \
 # Get it with: hostname -I | awk '{print $1}'
 ```
 
-Test: Access `http://<Cloud9-Public-IP>:8080` in a browser. Confirm:
+Test: Use **Cloud9 Preview** (Tools → Preview → Preview Running Application) or access `http://<Cloud9-Public-IP>:8080` in a browser. Confirm:
 - Login page loads at `/login`
 - Health check works at `/health`
+
+> **⚠️ Learner Lab Note**: Direct access via public IP may be blocked by security groups. Use **Cloud9 Preview** instead: click **Preview** → **Preview Running Application** in the Cloud9 menu bar. Append the port path if needed (e.g., `/health`).
 
 ### Task 4.4: Build and test the Supplier microservice
 
 ```bash
-cd ~/environment/b2b-marketplace/microservices/supplier
+cd ~/environment/AWS_LAB/microservices/supplier
 
 # Build the Docker image
 docker build --tag supplier .
@@ -268,9 +284,11 @@ docker run -d --name supplier_1 -p 8081:8080 \
   supplier
 ```
 
-Test: Access `http://<Cloud9-Public-IP>:8081/admin/login` in a browser. Confirm:
+Test: Use **Cloud9 Preview** or access `http://<Cloud9-Public-IP>:8081/admin/login` in a browser. Confirm:
 - Supplier login page loads
 - Admin dashboard accessible after login
+
+> **Tip**: For Cloud9 Preview on port 8081, change the preview URL port from 8080 to 8081.
 
 ### Task 4.5: Clean up test containers
 
@@ -281,7 +299,7 @@ docker rm -f shop_1 supplier_1 mysql-test
 ### Task 4.6: Commit and push code to CodeCommit
 
 ```bash
-cd ~/environment/b2b-marketplace
+cd ~/environment/AWS_LAB
 git add .
 git commit -m "Verified: both microservices build and run correctly in Docker"
 git push codecommit main
@@ -294,6 +312,13 @@ git push codecommit main
 ### Task 5.1: Create ECR repositories and push Docker images
 
 ```bash
+# Navigate to project directory
+cd ~/environment/AWS_LAB
+
+# Build Docker images first (services are inside microservices/)
+docker build -t shop ./microservices/shop
+docker build -t supplier ./microservices/supplier
+
 # Get the Account ID
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
 echo "Account ID: $account_id"
@@ -332,12 +357,17 @@ Verify: In the ECR console → Select each repository → Confirm the `latest` i
 4. **Infrastructure**: Select **AWS Fargate (serverless)** only (uncheck EC2 instances if checked)
 5. Select **Create**
 
+> **⚠️ Learner Lab Note**: If creating the cluster via the console fails with a permissions error, use the CLI instead:
+> ```bash
+> aws ecs create-cluster --cluster-name b2b-marketplace
+> ```
+
 ### Task 5.3: Create task definition files and register them
 
 The task definition files are already in the `deployment/` directory. You need to update the placeholder values.
 
 ```bash
-cd ~/environment/b2b-marketplace/deployment
+cd ~/environment/AWS_LAB/deployment
 
 # Get required values
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
@@ -389,10 +419,10 @@ These files tell CodeDeploy how to deploy the new task definition during blue/gr
 
 ### Task 5.6: Reset image placeholder and push deployment files to CodeCommit
 
-Before setting up the pipeline, change the `image` field back to the placeholder `<IMAGE1_NAME>` in both task definitions. CodePipeline will dynamically replace this during deployment.
+Keep the `image` field as `<IMAGE1_NAME>` in both task definitions. The deploy script (Phase 9) will replace this placeholder with the actual ECR image URI during deployment.
 
 ```bash
-cd ~/environment/b2b-marketplace
+cd ~/environment/AWS_LAB
 git add .
 git commit -m "Task definitions and AppSpec files with IMAGE1_NAME placeholder"
 git push codecommit main
@@ -411,10 +441,10 @@ git push codecommit main
    - **DB instance identifier**: `b2bmarket-db`
    - **Master username**: `admin`
    - **Master password**: `lab-password`
-   - **DB instance class**: `db.t3.micro` (cheapest)
-   - **Storage**: 20 GB gp2 (minimum), disable auto-scaling
+   - **DB instance class**: `db.c6gd.medium` (Note: `db.t3.micro` may not be available in Learner Lab)
+   - **Storage**: 20 GB gp3 (Note: `gp2` may not be available; use `gp3`), disable auto-scaling
    - **Multi-AZ**: **NO** (saves cost)
-   - **VPC**: LabVPC
+   - **VPC**: LabVPC (or default VPC if LabVPC is not available)
    - **Public access**: **Yes** (for initial setup from Cloud9; can restrict later via security groups)
    - **VPC security group**: Create new → `b2b-rds-sg`
    - **Initial database name**: `b2bmarket`
@@ -436,6 +466,8 @@ git push codecommit main
 
 ### Task 6.3: Initialize the database
 
+> **⚠️ Learner Lab Note**: To connect to RDS from Cloud9, go to the RDS console → select your DB instance → **Connected compute resources** → **Set up EC2 connection** → select your Cloud9 EC2 instance. This automatically configures the security groups for connectivity.
+
 ```bash
 # Get the RDS endpoint
 # Go to RDS Console → Databases → b2bmarket-db → Copy the Endpoint
@@ -446,6 +478,9 @@ mysql -h <RDS-ENDPOINT> -u admin -p
 
 # Verify connection
 SHOW DATABASES;
+
+# Create the database if it doesn't exist (if you didn't set initial database name during creation)
+CREATE DATABASE IF NOT EXISTS b2bmarket;
 USE b2bmarket;
 
 # Exit MySQL
@@ -454,10 +489,10 @@ exit
 
 Load the schema and seed data:
 ```bash
-mysql -h <RDS-ENDPOINT> -u admin -plab-password b2bmarket < ~/environment/b2b-marketplace/deployment/db-init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password b2bmarket < ~/environment/AWS_LAB/deployment/db-init.sql
 ```
 
-Verify:
+Verify (note: you must include `-u admin -plab-password` and the database name):
 ```bash
 mysql -h <RDS-ENDPOINT> -u admin -plab-password b2bmarket -e "SHOW TABLES;"
 ```
@@ -467,11 +502,14 @@ You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orde
 ### Task 6.4: Update task definitions with the RDS endpoint
 
 ```bash
-cd ~/environment/b2b-marketplace/deployment
+cd ~/environment/AWS_LAB/deployment
 
 # Replace the placeholder in both task definition files
 # Use the actual RDS endpoint (e.g., b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com)
 sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' taskdef-shop.json taskdef-supplier.json
+```
+
+> **Note**: Replace `b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com` with your actual RDS endpoint.
 ```
 
 ---
@@ -484,14 +522,14 @@ In the **EC2** console → **Security Groups** → **Create Security Group**:
 
 **Security Group 1: ALB Security Group**
 - **Name**: `b2b-alb-sg`
-- **VPC**: LabVPC
+- **VPC**: LabVPC (or your chosen VPC)
 - **Inbound Rules**:
   - Type: **HTTP (TCP 80)**, Source: **Anywhere (0.0.0.0/0)**
 - **Outbound Rules**: Default (all traffic)
 
 **Security Group 2: ECS Tasks Security Group**
 - **Name**: `b2b-ecs-sg`
-- **VPC**: LabVPC
+- **VPC**: LabVPC (or your chosen VPC)
 - **Inbound Rules**:
   - Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB security group)
 - **Outbound Rules**: Default (all traffic — needed for ECR pulls, RDS access, S3 access, CloudWatch)
@@ -531,15 +569,15 @@ In the **Amazon EC2** console → **Target Groups** → **Create target group**:
 
 | Target Group Name | Type | Port | VPC | Health Check Path |
 |---|---|---|---|---|
-| `shop-tg-one` | IP addresses | 8080 | LabVPC | `/health` |
-| `shop-tg-two` | IP addresses | 8080 | LabVPC | `/health` |
-| `supplier-tg-one` | IP addresses | 8080 | LabVPC | `/health` |
-| `supplier-tg-two` | IP addresses | 8080 | LabVPC | `/health` |
+| `shop-tg-one` | IP addresses | 8080 | Your VPC | `/health` |
+| `shop-tg-two` | IP addresses | 8080 | Your VPC | `/health` |
+| `supplier-tg-one` | IP addresses | 8080 | Your VPC | `/health` |
+| `supplier-tg-two` | IP addresses | 8080 | Your VPC | `/health` |
 
 For each target group:
 1. Select **IP addresses** as the target type
 2. Protocol: **HTTP**, Port: **8080**
-3. VPC: **LabVPC**
+3. VPC: **Your VPC** (LabVPC or default VPC)
 4. Health check protocol: **HTTP**
 5. Health check path: `/health`
 6. Do NOT register any targets yet (ECS will register them automatically)
@@ -552,8 +590,8 @@ For each target group:
    - **Name**: `b2b-alb`
    - **Scheme**: **Internet-facing**
    - **IP address type**: IPv4
-   - **VPC**: LabVPC
-   - **Mappings**: Select **Public Subnet 1** and **Public Subnet 2**
+   - **VPC**: Your VPC (LabVPC or default VPC)
+   - **Mappings**: Select **2 public subnets** (Public Subnet 1 and Public Subnet 2, or any 2 public subnets in your VPC)
    - **Security group**: Select `b2b-alb-sg`
    - **Listener HTTP:80**: Default action → Forward to `shop-tg-two`
 3. Select **Create load balancer**
@@ -585,14 +623,16 @@ The service configuration files are in the `deployment/` directory. Update the p
 
 Edit `create-shop-microservice-tg-two.json`:
 ```bash
-cd ~/environment/b2b-marketplace/deployment
+cd ~/environment/AWS_LAB/deployment
 ```
 
 Replace the following placeholders:
 - `<REVISION-NUMBER>` → Get from **ECS Console** → **Task Definitions** → `shop` → Note the latest revision number
 - `<ARN-shop-tg-two>` → Get from **EC2** → **Target Groups** → `shop-tg-two` → Copy the ARN
-- `<PUBLIC-SUBNET-1-ID>` and `<PUBLIC-SUBNET-2-ID>` → Get from **VPC** → **Subnets** → Copy the Public Subnet IDs
-- `<MICROSERVICES-SG-ID>` → Get from **EC2** → **Security Groups** → `b2b-ecs-sg` → Copy the Security Group ID
+- `<PUBLIC-SUBNET-1-ID>` and `<PUBLIC-SUBNET-2-ID>` → Get from **VPC** → **Subnets** → Copy the Public Subnet IDs (use the same subnets you chose for ALB)
+- `<B2B-ECS-SG-ID>` → Get from **EC2** → **Security Groups** → `b2b-ecs-sg` → Copy the Security Group ID
+
+> **⚠️ Important**: The JSON files have `"deploymentController": {"type": "CODE_DEPLOY"}`. If you plan to use the **Manual ECS Rolling Deployment** alternative (Phase 9), change this to `"type": "ECS"` in both JSON files **before creating the services**. You cannot change the deployment controller after service creation.
 
 Edit `create-supplier-microservice-tg-two.json`:
 - Same subnet and security group values
@@ -603,7 +643,7 @@ Edit `create-supplier-microservice-tg-two.json`:
 ### Task 8.2: Create the ECS service for the Shop microservice
 
 ```bash
-cd ~/environment/b2b-marketplace/deployment
+cd ~/environment/AWS_LAB/deployment
 aws ecs create-service --service-name shop-service \
   --cli-input-json file://create-shop-microservice-tg-two.json
 ```
@@ -633,20 +673,29 @@ Verify:
 
 ---
 
-## Phase 9: Configuring CodeDeploy and CodePipeline (No CodeBuild)
+## Phase 9: Configuring CodeDeploy (Blue/Green Deployment)
 
-> **⚠️ IMPORTANT: CodeBuild is NOT available in AWS Academy Learner Lab.** The pipeline skips the build stage. Docker images are built and pushed to ECR manually from Cloud9. The pipeline is triggered automatically when a new image is pushed to ECR.
+> **⚠️ IMPORTANT: CodeBuild and CodePipeline are NOT available in AWS Academy Learner Lab.** Docker images are built and pushed to ECR manually from Cloud9. CodeDeploy blue/green deployments are triggered via CLI.
+
+> **⚠️ Learner Lab IAM Note**: If you encounter IAM/permission errors when creating CodeDeploy resources via the **console**, try the **CLI alternative** provided for each step.
 
 ### Task 9.1: Create a CodeDeploy application
 
+**Option A: Console**
 1. Open the **CodeDeploy** console
 2. Select **Create application**
 3. **Application name**: `b2b-marketplace`
 4. **Compute platform**: **Amazon ECS**
 5. Select **Create application**
 
+**Option B: CLI (if console fails)**
+```bash
+aws deploy create-application --application-name b2b-marketplace --compute-platform ECS
+```
+
 ### Task 9.2: Create a deployment group for the Shop microservice
 
+**Option A: Console**
 1. In the CodeDeploy application → Select **Create deployment group**
 2. Configure:
    - **Deployment group name**: `b2b-shop-dg`
@@ -666,61 +715,199 @@ Verify:
      - Original revision termination: Days: 0, Hours: 0, Minutes: **5**
 3. Select **Create deployment group**
 
+**Option B: CLI (if console fails)**
+```bash
+# Get required values
+account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
+
+# Get target group ARNs
+shop_tg_one_arn=$(aws elbv2 describe-target-groups --names shop-tg-one --query 'TargetGroups[0].TargetGroupArn' --output text)
+shop_tg_two_arn=$(aws elbv2 describe-target-groups --names shop-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+# Get ALB listener ARN
+alb_arn=$(aws elbv2 describe-load-balancers --names b2b-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+listener_arn=$(aws elbv2 describe-listeners --load-balancer-arn $alb_arn --query 'Listeners[0].ListenerArn' --output text)
+
+aws deploy create-deployment-group \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-shop-dg \
+  --service-role-arn arn:aws:iam::${account_id}:role/LabRole \
+  --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+  --ecs-services clusterName=b2b-marketplace,serviceName=shop-service \
+  --load-balancer-info "targetGroupPairInfoList=[{targetGroups=[{name=shop-tg-two},{name=shop-tg-one}],prodTrafficRoute={listenerArns=[$listener_arn]}}]" \
+  --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL \
+  --blue-green-deployment-configuration "terminateBlueInstancesOnDeploymentSuccess={action=TERMINATE,terminationWaitTimeInMinutes=5},deploymentReadyOption={actionOnTimeout=CONTINUE_DEPLOYMENT}"
+```
+
 ### Task 9.3: Create a deployment group for the Supplier microservice
 
-Repeat the same steps with:
+Repeat the same steps (console or CLI) with:
 - **Deployment group name**: `b2b-supplier-dg`
 - **ECS service name**: Select `supplier-service`
 - **Target group 1 name**: Select `supplier-tg-two`
 - **Target group 2 name**: Select `supplier-tg-one`
 
-### Task 9.4: Create a CodePipeline for the Shop microservice
+### Task 9.4: Trigger CodeDeploy Blue/Green Deployment via CLI (replaces CodePipeline)
 
-1. Open the **CodePipeline** console → Select **Create pipeline**
-2. Select **Build custom pipeline**
-3. Configure:
-   - **Pipeline name**: `update-shop-service`
-   - **Service role**: Select **Existing service role** → Select the **LabRole** ARN (or PipelineRole if available)
-4. **Source stage**:
-   - Source provider: **Amazon ECR**
-   - Repository name: `shop`
-   - Image tag: `latest`
-5. **Build stage**: Select **Skip build stage** ← ⚠️ CodeBuild not available in Learner Lab
-6. **Deploy stage**:
-   - Deploy provider: **Amazon ECS (Blue/Green)**
-   - AWS CodeDeploy application name: `b2b-marketplace`
-   - AWS CodeDeploy deployment group: `b2b-shop-dg`
-   - Amazon ECS task definition: Select **BuildArtifact** → Enter `deployment/taskdef-shop.json`
-   - AWS CodeDeploy AppSpec file: Select **BuildArtifact** → Enter `deployment/appspec-shop.yaml`
-   - Input artifact with image details: Select **SourceArtifact**
-   - Placeholder text in the task definition: `<IMAGE1_NAME>`
-7. Select **Create pipeline**
+> **⚠️ Learner Lab Note**: CodePipeline is **not available** in Learner Lab due to IAM restrictions. Instead, we trigger CodeDeploy blue/green deployments **directly from the CLI**. This achieves the same blue/green deployment result — the only difference is the trigger is manual instead of automated by a pipeline.
 
-> The pipeline will attempt to run immediately. It may fail on the first run because the source artifact structure may need adjustment. This is expected — the pipeline will work correctly on subsequent ECR image pushes.
+**Deploy the Shop microservice:**
 
-### Task 9.5: Create a CodePipeline for the Supplier microservice
+```bash
+cd ~/environment/AWS_LAB
 
-Repeat the same steps with:
-- **Pipeline name**: `update-supplier-service`
-- **Source stage**: ECR repository `supplier`, tag `latest`
-- **Deploy stage**: deployment group `b2b-supplier-dg`, task def `deployment/taskdef-supplier.json`, appspec `deployment/appspec-supplier.yaml`
+# Get account ID and set variables
+account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
 
-### How the CI/CD Pipeline Works
+# Step 1: Update the task definition with the actual ECR image URI
+# (Replace <IMAGE1_NAME> with the real image URI)
+sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest|g" deployment/taskdef-shop.json
+
+# Step 2: Register the updated task definition and get the new revision ARN
+SHOP_TASKDEF_ARN=$(aws ecs register-task-definition \
+  --cli-input-json file://deployment/taskdef-shop.json \
+  --query 'taskDefinition.taskDefinitionArn' --output text)
+echo "Shop Task Definition ARN: $SHOP_TASKDEF_ARN"
+
+# Step 3: Update the appspec to use the new task definition ARN
+sed -i "s|<TASK_DEFINITION>|$SHOP_TASKDEF_ARN|g" deployment/appspec-shop.yaml
+
+# Step 4: Create the CodeDeploy deployment
+aws deploy create-deployment \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-shop-dg \
+  --revision '{"revisionType":"AppSpecContent","appSpecContent":{"content":"'"$(cat deployment/appspec-shop.yaml | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" | tr -d '"')"'"}}' \
+  --description "Deploy shop service via CLI"
+```
+
+> **Note**: If the `--revision` inline approach is too complex, you can upload the AppSpec to S3 instead:
+> ```bash
+> # Upload appspec to S3
+> aws s3 cp deployment/appspec-shop.yaml s3://b2b-marketplace-images/deploy/appspec-shop.yaml
+>
+> # Create deployment from S3
+> aws deploy create-deployment \
+>   --application-name b2b-marketplace \
+>   --deployment-group-name b2b-shop-dg \
+>   --s3-location bucket=b2b-marketplace-images,key=deploy/appspec-shop.yaml,bundleType=YAML
+> ```
+
+**Deploy the Supplier microservice:**
+
+```bash
+# Step 1: Update task definition with ECR image URI
+sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/supplier:latest|g" deployment/taskdef-supplier.json
+
+# Step 2: Register and get revision ARN
+SUPPLIER_TASKDEF_ARN=$(aws ecs register-task-definition \
+  --cli-input-json file://deployment/taskdef-supplier.json \
+  --query 'taskDefinition.taskDefinitionArn' --output text)
+echo "Supplier Task Definition ARN: $SUPPLIER_TASKDEF_ARN"
+
+# Step 3: Update appspec
+sed -i "s|<TASK_DEFINITION>|$SUPPLIER_TASKDEF_ARN|g" deployment/appspec-supplier.yaml
+
+# Step 4: Create deployment
+aws deploy create-deployment \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-supplier-dg \
+  --revision '{"revisionType":"AppSpecContent","appSpecContent":{"content":"'"$(cat deployment/appspec-supplier.yaml | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" | tr -d '"')"'"}}' \
+  --description "Deploy supplier service via CLI"
+```
+
+### Task 9.5: Monitor the CodeDeploy deployment
+
+```bash
+# List recent deployments
+aws deploy list-deployments --application-name b2b-marketplace --output table
+
+# Get deployment status (replace <DEPLOYMENT-ID> with actual ID from above)
+aws deploy get-deployment --deployment-id <DEPLOYMENT-ID> \
+  --query 'deploymentInfo.status' --output text
+```
+
+You can also monitor in the **CodeDeploy Console** → **Deployments** → Watch the blue/green traffic shift.
+
+### Task 9.6: Create a reusable deployment script (optional)
+
+To simplify future deployments, save this as `deploy.sh` in the project root:
+
+```bash
+#!/bin/bash
+# Usage: ./deploy.sh shop   OR   ./deploy.sh supplier
+
+SERVICE=$1
+if [ -z "$SERVICE" ]; then
+  echo "Usage: ./deploy.sh <shop|supplier>"
+  exit 1
+fi
+
+account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
+IMAGE_URI="$account_id.dkr.ecr.us-east-1.amazonaws.com/$SERVICE:latest"
+
+echo "=== Building $SERVICE ==="
+cd ~/environment/AWS_LAB/microservices/$SERVICE
+docker build -t $SERVICE .
+
+echo "=== Pushing to ECR ==="
+docker tag $SERVICE:latest $IMAGE_URI
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $account_id.dkr.ecr.us-east-1.amazonaws.com
+docker push $IMAGE_URI
+
+echo "=== Registering new task definition ==="
+cd ~/environment/AWS_LAB/deployment
+# Create a temp copy to avoid modifying the original
+cp taskdef-$SERVICE.json /tmp/taskdef-$SERVICE-deploy.json
+sed -i "s|<IMAGE1_NAME>|$IMAGE_URI|g" /tmp/taskdef-$SERVICE-deploy.json
+sed -i "s|<ACCOUNT-ID>|$account_id|g" /tmp/taskdef-$SERVICE-deploy.json
+
+TASKDEF_ARN=$(aws ecs register-task-definition \
+  --cli-input-json file:///tmp/taskdef-$SERVICE-deploy.json \
+  --query 'taskDefinition.taskDefinitionArn' --output text)
+echo "New Task Definition: $TASKDEF_ARN"
+
+echo "=== Creating CodeDeploy deployment ==="
+# Create temp appspec with actual task def ARN
+cp appspec-$SERVICE.yaml /tmp/appspec-$SERVICE-deploy.yaml
+sed -i "s|<TASK_DEFINITION>|$TASKDEF_ARN|g" /tmp/appspec-$SERVICE-deploy.yaml
+
+# Upload to S3 and deploy
+aws s3 cp /tmp/appspec-$SERVICE-deploy.yaml s3://b2b-marketplace-images/deploy/appspec-$SERVICE.yaml
+DEPLOYMENT_ID=$(aws deploy create-deployment \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-$SERVICE-dg \
+  --s3-location bucket=b2b-marketplace-images,key=deploy/appspec-$SERVICE.yaml,bundleType=YAML \
+  --query 'deploymentId' --output text)
+
+echo "=== Deployment started: $DEPLOYMENT_ID ==="
+echo "Monitor at: https://console.aws.amazon.com/codedeploy/home?region=us-east-1#/deployments/$DEPLOYMENT_ID"
+```
+
+Make it executable: `chmod +x ~/environment/AWS_LAB/deploy.sh`
+
+Usage:
+```bash
+./deploy.sh shop      # Build, push, and deploy shop service
+./deploy.sh supplier  # Build, push, and deploy supplier service
+```
+
+### How the CI/CD Deployment Works
 
 ```
-Developer makes code changes
+Developer makes code changes in Cloud9
         │
         ▼
-Builds Docker image locally/Cloud9
+Builds Docker image locally (docker build)
         │
         ▼
-Pushes new image to ECR (shop:latest or supplier:latest)
+Tags and pushes new image to ECR (shop:latest or supplier:latest)
         │
         ▼
-ECR image update automatically triggers CodePipeline
+Registers new ECS task definition with updated image URI
         │
         ▼
-CodePipeline → CodeDeploy (Blue/Green)
+Triggers CodeDeploy blue/green deployment via CLI
+(or uses deploy.sh script for automation)
         │
         ▼
 CodeDeploy creates new ECS tasks in standby target group (tg-one)
@@ -732,24 +919,34 @@ Health check passes → ALB traffic switches to new tasks
 Old tasks in previous target group (tg-two) terminated after 5 minutes
 ```
 
+> **Note**: In a production environment, CodePipeline would automate steps 2-5 (triggered by ECR image push). In Learner Lab, CodePipeline is not available, so we trigger CodeDeploy manually via CLI — achieving the same blue/green deployment result.
+
 ---
 
-## Phase 10: Testing the CI/CD Pipeline
+## Phase 10: Testing the CI/CD Deployment
 
-### Task 10.1: Make a code change to trigger the pipeline
+### Task 10.1: Make a code change
 
 ```bash
-cd ~/environment/b2b-marketplace/microservices/shop
+cd ~/environment/AWS_LAB/microservices/shop
 
 # Make a visible change (e.g., update the home page title)
 # Edit views/home.ejs — change any visible text
 ```
 
-### Task 10.2: Build and push the updated image to ECR
+### Task 10.2: Build, push, and deploy using the deploy script
 
+**Option A: Using the deploy script (recommended)**
+```bash
+cd ~/environment/AWS_LAB
+chmod +x deploy.sh
+./deploy.sh shop
+```
+
+**Option B: Manual steps**
 ```bash
 # Rebuild the Shop image
-cd ~/environment/b2b-marketplace/microservices/shop
+cd ~/environment/AWS_LAB/microservices/shop
 docker build --tag shop .
 
 # Tag and push to ECR
@@ -760,16 +957,24 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS \
   --password-stdin $account_id.dkr.ecr.us-east-1.amazonaws.com
 
 docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
+
+# Then trigger CodeDeploy (see Task 9.4 for full commands)
 ```
 
-### Task 10.3: Monitor the pipeline execution
+### Task 10.3: Monitor the CodeDeploy deployment
 
-1. Open the **CodePipeline** console → Select `update-shop-service`
-2. Observe the pipeline stages:
-   - **Source** stage: Detects new ECR image → ✅
-   - **Deploy** stage: CodeDeploy blue/green deployment in progress
-3. Open **CodeDeploy** console → Deployments → Watch the deployment progress
-4. Wait for deployment to complete (typically 3-5 minutes)
+1. Open the **CodeDeploy** console → **Deployments** → Watch the blue/green deployment progress
+2. Or use CLI:
+```bash
+# List recent deployments
+aws deploy list-deployments --application-name b2b-marketplace \
+  --deployment-group-name b2b-shop-dg --output table
+
+# Check specific deployment status
+aws deploy get-deployment --deployment-id <DEPLOYMENT-ID> \
+  --query 'deploymentInfo.[status,deploymentOverview]' --output table
+```
+3. Wait for deployment to complete (typically 3-5 minutes)
 
 ### Task 10.4: Verify the deployment
 
@@ -874,7 +1079,7 @@ The `LabRole` is a pre-configured IAM role with broad permissions across support
 | **ECS Task Execution Role** | `LabRole` | Pull images from ECR, push logs to CloudWatch | Service role — allows ECS agent to act on your behalf |
 | **ECS Task Role** | `LabRole` | Runtime: access RDS, S3 (image uploads), CloudWatch | Application role — grants permissions to the running container |
 | **CodeDeploy Service Role** | `LabRole` | Manage ECS deployments, modify ALB target groups | Service role — allows CodeDeploy to manage infrastructure |
-| **CodePipeline Service Role** | `LabRole` | Orchestrate pipeline stages, access ECR and S3 artifacts | Service role — allows CodePipeline to invoke other services |
+| ~~**CodePipeline Service Role**~~ | ~~`LabRole`~~ | ~~Orchestrate pipeline stages~~ | Not available in Learner Lab — CodeDeploy triggered via CLI instead |
 | **Cloud9 EC2 Instance** | `LabInstanceProfile` | AWS CLI commands, Docker push to ECR | Instance profile — attached to EC2 for AWS API access |
 
 ### IAM Concepts Applied (from Lecture 6 - M03)
@@ -882,7 +1087,7 @@ The `LabRole` is a pre-configured IAM role with broad permissions across support
 | Concept | How It's Applied in This Project |
 |---|---|
 | **Principle of Least Privilege** | Security groups restrict access layer-by-layer (ALB → ECS → RDS). In production, each service would have its own role with minimal permissions. |
-| **IAM Roles (not users) for services** | ECS tasks, CodeDeploy, and CodePipeline all use IAM roles (LabRole), not long-term credentials. This follows AWS best practice. |
+| **IAM Roles (not users) for services** | ECS tasks and CodeDeploy use IAM roles (LabRole), not long-term credentials. This follows AWS best practice. |
 | **Shared Responsibility Model** | AWS manages infrastructure security (hardware, networking, managed services). We manage application security (authentication, input validation, security groups, encryption in transit). |
 | **Temporary Credentials** | ECS tasks receive temporary security credentials via the task role. Credentials rotate automatically — no static access keys needed. |
 | **Identity-Based Policies** | LabRole has an identity-based policy attached that grants permissions to AWS services. In production, you would create specific policies per service. |
@@ -1001,14 +1206,14 @@ In a real production environment, you would create separate IAM roles per servic
 |---|---|
 | `ecsTaskExecutionRole` | `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `logs:CreateLogStream`, `logs:PutLogEvents` |
 | `codeDeployRole` | `ecs:*`, `elasticloadbalancing:*`, `iam:PassRole` |
-| `codePipelineRole` | `ecr:DescribeImages`, `codedeploy:CreateDeployment`, `s3:*` (artifacts) |
+| ~~`codePipelineRole`~~ | ~~Not available in Learner Lab~~ |
 
 #### IAM Users and Groups (for team members)
 
 | IAM Group | Members | Policies |
 |---|---|---|
 | `Developers` | Team members who write code | CodeCommit push/pull, ECR push, Cloud9 access |
-| `DevOps` | Team members who manage infrastructure | Full ECS/ALB/RDS/CodePipeline access |
+| `DevOps` | Team members who manage infrastructure | Full ECS/ALB/RDS/CodeDeploy access |
 | `ReadOnly` | Reviewers, project managers | ViewOnly access to all resources |
 
 > **In Learner Lab**: All of this is handled by the single `LabRole`. The application-level RBAC (shop/supplier/admin middleware) compensates for the inability to create per-service IAM roles.
@@ -1043,7 +1248,7 @@ In a real production environment, you would create separate IAM roles per servic
 | **Encryption in Transit** | ALB handles HTTP traffic. In production, add ACM certificate for HTTPS (TLS termination at ALB). |
 | **Encryption at Rest** | RDS supports encryption at rest (enabled by default for new instances). S3 uses server-side encryption. |
 | **No Hardcoded Secrets** | Database credentials passed via ECS task definition environment variables. In production, use AWS Secrets Manager. |
-| **Automated Deployments** | CodePipeline/CodeDeploy eliminates manual access to production servers. No SSH needed. |
+| **Automated Deployments** | CodeDeploy blue/green deployments eliminate manual access to production servers. No SSH needed. Deploy script automates the CLI workflow. |
 
 ---
 
@@ -1057,7 +1262,7 @@ In a real production environment, you would create separate IAM roles per servic
 2. **RDS left running** (~$0.41/day) — RDS does NOT auto-stop when lab session ends!
 3. **Forgetting to scale down ECS** (~$0.58/day for 2 tasks)
 4. **Multiple ALBs** (~$0.54/day each) — Use 1 ALB with path-based routing
-5. **Large RDS instance** — Always use `db.t3.micro`
+5. **Large RDS instance** — Use `db.c6gd.medium` (smallest available in Learner Lab; `db.t3.micro` may not be available). **Stop RDS when not working** — this instance costs ~$1.63/day!
 
 ### Budget-Saving Actions
 
@@ -1091,13 +1296,15 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 
 | Phase | What's Running | Days | Daily Cost | Total |
 |---|---|---|---|---|
-| **Setup** (Cloud9 + RDS only) | Cloud9, RDS | 2 days | ~$0.49 | $0.98 |
-| **Deploy & Test** (all services) | RDS, 2×ECS, ALB, Cloud9 | 5 days | ~$1.79 | $8.95 |
+| **Setup** (Cloud9 + RDS only) | Cloud9, RDS | 2 days | ~$1.71 | $3.42 |
+| **Deploy & Test** (all services) | RDS, 2×ECS, ALB, Cloud9 | 3 days | ~$3.36 | $10.08 |
 | **Idle** (ALB + stopped services) | ALB only (ECS=0, RDS stopped) | 10 days | ~$0.64 | $6.40 |
-| **Demo Day** (everything running) | All services | 1 day | ~$1.79 | $1.79 |
+| **Demo Day** (everything running) | All services | 1 day | ~$3.36 | $3.36 |
 | **Buffer for unexpected costs** | — | — | — | $10.00 |
-| **TOTAL ESTIMATED** | | | | **~$28** |
-| **Remaining from $50** | | | | **~$22** |
+| **TOTAL ESTIMATED** | | | | **~$33** |
+| **Remaining from $50** | | | | **~$17** |
+
+> **💡 Budget Tip**: To save money, keep RDS running only when actively working (start/stop manually). During Setup phase, run RDS for just 2-3 hours for DB init, then stop it. This can cut Setup costs to ~$0.50.
 
 ---
 
@@ -1109,8 +1316,8 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 3. Open **Target Groups** → Show 4 target groups (blue/green pairs)
 4. Open **CloudWatch** → Show log streams for `/ecs/shop` and `/ecs/supplier`
 5. Open **S3 Console** → Show product images bucket
-6. Open **CodePipeline** → Show pipeline stages and last execution
-7. Explain: "We use **LabRole** for all service roles (ECS, CodeDeploy, CodePipeline) because Learner Lab does not allow custom IAM role creation."
+6. Open **CodeDeploy** → Show deployment history and blue/green status
+7. Explain: "We use **LabRole** for all service roles (ECS, CodeDeploy) because Learner Lab does not allow custom IAM role creation. CodePipeline is not available, so we trigger deployments via CLI."
 
 ### Step 1: Login & Registration
 1. Open Shop login page (`http://<ALB-DNS>/login`) → Login as `shop1@b2bmarket.com` / `password123`
@@ -1154,7 +1361,7 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 ### Step 8: Demonstrate CI/CD (Update & Redeploy)
 1. Make a small change in Cloud9 (e.g., update home page text)
 2. Rebuild Docker image and push to ECR
-3. Show CodePipeline automatically triggered
+3. Run `./deploy.sh shop` to trigger CodeDeploy
 4. Show CodeDeploy blue/green deployment in progress
 5. Show new version deployed after traffic switch
 
@@ -1204,9 +1411,9 @@ aws logs delete-log-group --log-group-name /ecs/shop
 aws logs delete-log-group --log-group-name /ecs/supplier
 # Delete CodeDeploy application
 aws deploy delete-application --application-name b2b-marketplace
-# Delete CodePipeline pipelines
-aws codepipeline delete-pipeline --name update-shop-service
-aws codepipeline delete-pipeline --name update-supplier-service
+# Delete CodePipeline pipelines (skip if never created)
+# aws codepipeline delete-pipeline --name update-shop-service
+# aws codepipeline delete-pipeline --name update-supplier-service
 # Delete CodeCommit repository
 aws codecommit delete-repository --repository-name b2b-marketplace
 ```
