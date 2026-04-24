@@ -1,74 +1,84 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My Profile - Supplier Panel</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - Supplier Portal</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#f5f7f5; }
+    .card { border:0; border-radius:12px; }
+    .avatar-circle { width:80px; height:80px; border-radius:50%; background:linear-gradient(135deg,#0d4f2b,#1a7a4a); color:#fff; display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:700; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>My Profile</h2>
+  <div class="container py-4">
+    <h3 class="fw-bold mb-4">My Profile</h3>
+
     <% if (success) { %>
-      <div class="alert alert-success alert-dismissible"><%= success %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+      <div class="alert alert-success alert-dismissible border-0 rounded-3"><%= success %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
     <% } %>
     <% if (error) { %>
-      <div class="alert alert-danger alert-dismissible"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+      <div class="alert alert-danger alert-dismissible border-0 rounded-3"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
     <% } %>
-    <div class="row">
-      <div class="col-md-6">
-        <div class="card mb-4">
-          <div class="card-header"><strong>Profile Information</strong></div>
-          <div class="card-body">
-            <form method="POST" action="/admin/profile">
-              <div class="mb-3">
-                <label class="form-label">Full Name</label>
-                <input type="text" name="full_name" class="form-control" value="<%= user.full_name %>" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" value="<%= user.email %>" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Role</label>
-                <span class="badge bg-<%= user.role === 'admin' ? 'danger' : 'primary' %> fs-6"><%= user.role %></span>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Status</label>
-                <span class="badge bg-<%= user.status === 'approved' ? 'success' : user.status === 'pending' ? 'warning' : 'danger' %>"><%= user.status %></span>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Member Since</label>
-                <input type="text" class="form-control" value="<%= new Date(user.created_at).toLocaleDateString() %>" disabled>
-              </div>
-              <button type="submit" class="btn btn-primary">Update Profile</button>
-            </form>
-          </div>
+
+    <div class="row g-4">
+      <!-- Avatar Card -->
+      <div class="col-lg-3">
+        <div class="card shadow-sm p-4 text-center">
+          <div class="avatar-circle mx-auto mb-3"><%= user.full_name ? user.full_name.charAt(0).toUpperCase() : 'S' %></div>
+          <h6 class="fw-bold mb-1"><%= user.full_name %></h6>
+          <p class="text-muted small mb-2"><%= user.email %></p>
+          <span class="badge bg-<%= user.role === 'admin' ? 'danger' : 'success' %> mb-1"><%= user.role %></span>
+          <span class="badge bg-<%= user.status === 'approved' ? 'success' : user.status === 'pending' ? 'warning' : 'danger' %>"><%= user.status %></span>
+          <hr>
+          <small class="text-muted">Member since <%= new Date(user.created_at).toLocaleDateString() %></small>
         </div>
       </div>
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header"><strong>Change Password</strong></div>
-          <div class="card-body">
-            <form method="POST" action="/admin/profile/password">
-              <div class="mb-3">
-                <label class="form-label">Current Password</label>
-                <input type="password" name="old_password" class="form-control" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">New Password</label>
-                <input type="password" name="new_password" class="form-control" required minlength="6">
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Confirm New Password</label>
-                <input type="password" name="confirm_password" class="form-control" required minlength="6">
-              </div>
-              <button type="submit" class="btn btn-warning">Change Password</button>
-            </form>
-          </div>
+
+      <!-- Profile Form -->
+      <div class="col-lg-5">
+        <div class="card shadow-sm p-4">
+          <h5 class="fw-bold mb-3">Profile Information</h5>
+          <form method="POST" action="/admin/profile">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Full Name</label>
+              <input type="text" name="full_name" class="form-control" value="<%= user.full_name %>" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Email</label>
+              <input type="email" name="email" class="form-control" value="<%= user.email %>" required>
+            </div>
+            <button type="submit" class="btn btn-success">Update Profile</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Password Form -->
+      <div class="col-lg-4">
+        <div class="card shadow-sm p-4">
+          <h5 class="fw-bold mb-3">Change Password</h5>
+          <form method="POST" action="/admin/profile/password">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Current Password</label>
+              <input type="password" name="old_password" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">New Password</label>
+              <input type="password" name="new_password" class="form-control" required minlength="6">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Confirm Password</label>
+              <input type="password" name="confirm_password" class="form-control" required minlength="6">
+            </div>
+            <button type="submit" class="btn btn-warning">Change Password</button>
+          </form>
         </div>
       </div>
     </div>
   </div>
+  <%- include('partials/footer') %>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

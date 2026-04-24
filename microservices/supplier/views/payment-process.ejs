@@ -1,32 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Process Payment - Admin</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Process Payment - Supplier Portal</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#f5f7f5; }
+    .card { border:0; border-radius:12px; }
+    .method-option { cursor:pointer; transition:all .2s; border:2px solid #dee2e6 !important; border-radius:12px !important; }
+    .method-option:hover { border-color:#198754 !important; }
+    .method-option.selected { border-color:#198754 !important; background:#f1f8e9; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <a href="/admin/orders/<%= order_id %>" class="btn btn-secondary btn-sm mb-3">&larr; Back</a>
-    <h2>Process Payment for Order #<%= order_id %></h2>
-    <div class="card">
-      <div class="card-body">
-        <form method="POST" action="/admin/orders/<%= order_id %>/payment">
-          <div class="mb-3">
-            <label class="form-label">Payment Method</label>
-            <select name="method" class="form-select">
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="qr_code">QR Code</option>
-              <option value="cod">Cash on Delivery</option>
-            </select>
-          </div>
-          <div class="alert alert-info">
-            <strong>Note:</strong> If payment fails, the order will be automatically cancelled and product stock will be restored (Saga compensating transaction).
-          </div>
-          <button type="submit" class="btn btn-success">💳 Confirm Payment</button>
-        </form>
+  <div class="container py-4" style="max-width:700px">
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/admin/orders" class="text-success text-decoration-none">Orders</a></li>
+        <li class="breadcrumb-item"><a href="/admin/orders/<%= order_id %>" class="text-success text-decoration-none">Order #<%= order_id %></a></li>
+        <li class="breadcrumb-item active">Payment</li>
+      </ol>
+    </nav>
+
+    <div class="card shadow-sm p-4">
+      <div class="text-center mb-4">
+        <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:64px;height:64px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#0d4f2b" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2.5 1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-2z"/></svg>
+        </div>
+        <h4 class="fw-bold mb-1">Process Payment</h4>
+        <p class="text-muted">Order #<%= order_id %></p>
       </div>
+
+      <form method="POST" action="/admin/orders/<%= order_id %>/payment">
+        <label class="form-label fw-semibold mb-3">Select Payment Method</label>
+        <div class="d-flex flex-column gap-2 mb-4">
+          <label class="method-option p-3 d-flex align-items-center gap-3 selected">
+            <input type="radio" name="method" value="bank_transfer" class="form-check-input" checked>
+            <div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#0d4f2b" viewBox="0 0 16 16"><path d="M8 .95 14.61 4h.89a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5H.5a.5.5 0 0 1-.5-.5v-2A.5.5 0 0 1 .5 4h.89L8 .95zM3.5 8h1v5H3.5V8zm3 0h1v5h-1V8zm3 0h1v5h-1V8zm3 0h1v5h-1V8zM.5 14h15a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H.5a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5z"/></svg>
+            </div>
+            <div>
+              <strong>Bank Transfer</strong>
+              <div class="small text-muted">Direct bank-to-bank payment</div>
+            </div>
+          </label>
+          <label class="method-option p-3 d-flex align-items-center gap-3">
+            <input type="radio" name="method" value="qr_code" class="form-check-input">
+            <div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#0d4f2b" viewBox="0 0 16 16"><path d="M0 .5A.5.5 0 0 1 .5 0h3a.5.5 0 0 1 0 1H1v2.5a.5.5 0 0 1-1 0v-3zm12 0a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V1h-2.5a.5.5 0 0 1-.5-.5zM.5 12a.5.5 0 0 1 .5.5V15h2.5a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1 0-1H15v-2.5a.5.5 0 0 1 .5-.5z"/></svg>
+            </div>
+            <div>
+              <strong>QR Code</strong>
+              <div class="small text-muted">Scan and pay via mobile banking</div>
+            </div>
+          </label>
+          <label class="method-option p-3 d-flex align-items-center gap-3">
+            <input type="radio" name="method" value="cod" class="form-check-input">
+            <div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#0d4f2b" viewBox="0 0 16 16"><path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z"/></svg>
+            </div>
+            <div>
+              <strong>Cash on Delivery</strong>
+              <div class="small text-muted">Pay when goods are received</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="alert alert-warning border-0 rounded-3 d-flex gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="flex-shrink-0 mt-1" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+          <div>
+            <strong>Saga Pattern:</strong> If payment fails, the order will be automatically cancelled and product stock restored (compensating transaction).
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100 py-2 mt-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2.5 1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-2z"/></svg>
+          Confirm Payment
+        </button>
+      </form>
     </div>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.querySelectorAll('.method-option').forEach(function(el) {
+      el.addEventListener('click', function() {
+        document.querySelectorAll('.method-option').forEach(function(o){ o.classList.remove('selected'); });
+        el.classList.add('selected');
+      });
+    });
+  </script>
 </body>
 </html>

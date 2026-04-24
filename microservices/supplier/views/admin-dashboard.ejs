@@ -1,75 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#f5f5f5; }
+    .card { border:0; border-radius:12px; }
+    .stat-card { transition:transform .2s; }
+    .stat-card:hover { transform:translateY(-3px); }
+    .admin-header { background:linear-gradient(135deg,#1a1a2e,#16213e); border-radius:16px; color:#fff; }
+    .quick-link { text-decoration:none; color:#333; padding:1rem; border-radius:12px; background:#fff; border:1px solid #eee; transition:all .2s; display:flex; align-items:center; gap:.75rem; }
+    .quick-link:hover { border-color:#dc3545; box-shadow:0 4px 12px rgba(0,0,0,.08); transform:translateY(-2px); color:#333; }
+    .quick-link .icon-box { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>System Administration</h2>
-    <div class="row mt-3">
-      <div class="col-md-3">
-        <div class="card text-white bg-primary mb-3">
-          <div class="card-body text-center">
-            <h3><%= stats.totalUsers %></h3>
-            <p>Total Users</p>
-            <% if (stats.pendingUsers > 0) { %><span class="badge bg-warning"><%= stats.pendingUsers %> pending</span><% } %>
-            <br><a href="/admin/manage/users" class="btn btn-light btn-sm mt-2">Manage Users</a>
+  <div class="container py-4">
+    <!-- Admin Header -->
+    <div class="admin-header p-4 mb-4">
+      <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width:56px;height:56px;background:rgba(255,255,255,.15)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#fff" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg>
+        </div>
+        <div>
+          <h3 class="fw-bold mb-0">System Administration</h3>
+          <p class="mb-0 opacity-75">Monitor and manage the entire B2B marketplace platform</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="icon-box" style="background:#e3f2fd;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#1565c0" viewBox="0 0 16 16"><path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-.779.357-1.85 1.225-2.72.303-.303.664-.558 1.07-.767z"/></svg>
+            </div>
+            <div>
+              <div class="fs-4 fw-bold"><%= stats.totalUsers %></div>
+              <small class="text-muted">Users</small>
+              <% if (stats.pendingUsers > 0) { %><br><span class="badge bg-warning"><%= stats.pendingUsers %> pending</span><% } %>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-white bg-success mb-3">
-          <div class="card-body text-center">
-            <h3><%= stats.totalProducts %></h3>
-            <p>Total Products</p>
-            <% if (stats.pendingProducts > 0) { %><span class="badge bg-warning"><%= stats.pendingProducts %> pending</span><% } %>
-            <br><a href="/admin/manage/products" class="btn btn-light btn-sm mt-2">Approve Products</a>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="icon-box" style="background:#e8f5e9;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#2e7d32" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5 8 5.961 14.154 3.5 8.186 1.113zM15 4.239l-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923l6.5 2.6z"/></svg>
+            </div>
+            <div>
+              <div class="fs-4 fw-bold"><%= stats.totalProducts %></div>
+              <small class="text-muted">Products</small>
+              <% if (stats.pendingProducts > 0) { %><br><span class="badge bg-warning"><%= stats.pendingProducts %> pending</span><% } %>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-white bg-info mb-3">
-          <div class="card-body text-center">
-            <h3><%= stats.totalRFQs %></h3>
-            <p>Total RFQs</p>
-            <br><a href="/admin/manage/rfqs" class="btn btn-light btn-sm mt-2">View RFQs</a>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="icon-box" style="background:#fff3e0;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e65100" viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/><path d="M3 4h10v1H3V4zm0 3h10v1H3V7zm0 3h7v1H3v-1z"/></svg>
+            </div>
+            <div>
+              <div class="fs-4 fw-bold"><%= stats.totalRFQs %></div>
+              <small class="text-muted">RFQs</small>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-white bg-dark mb-3">
-          <div class="card-body text-center">
-            <h3><%= stats.totalContracts %></h3>
-            <p>Total Contracts</p>
-            <br><a href="/admin/manage/contracts" class="btn btn-light btn-sm mt-2">View Contracts</a>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="icon-box" style="background:#fce4ec;width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#c62828" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9.5 3A1.5 1.5 0 0 0 8 4.5V6h2.5L9.5 3z"/></svg>
+            </div>
+            <div>
+              <div class="fs-4 fw-bold"><%= stats.totalContracts %></div>
+              <small class="text-muted">Contracts</small>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    <div class="row">
-      <div class="col-md-6">
-        <div class="card mb-3">
-          <div class="card-body text-center">
-            <h3><%= stats.totalOrders %></h3>
-            <p>Total Orders</p>
-            <a href="/admin/orders" class="btn btn-outline-primary btn-sm">View Orders</a>
+
+    <!-- Orders + Quick Links -->
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="card shadow-sm p-4 text-center">
+          <div class="icon-box mx-auto mb-2" style="background:#e8eaf6;width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#283593" viewBox="0 0 16 16"><path d="M0 2.5A.5.5 0 0 1 .5 2H2a.5.5 0 0 1 .485.379L2.89 4H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 13H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5z"/></svg>
+          </div>
+          <div class="fs-3 fw-bold"><%= stats.totalOrders %></div>
+          <small class="text-muted mb-3 d-block">Total Orders</small>
+          <a href="/admin/orders" class="btn btn-outline-primary btn-sm">View All Orders</a>
+        </div>
+      </div>
+
+      <div class="col-lg-8">
+        <h5 class="fw-bold mb-3">Quick Access</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <a href="/admin/manage/users" class="quick-link">
+              <div class="icon-box" style="background:#e3f2fd"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#1565c0" viewBox="0 0 16 16"><path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg></div>
+              <div>
+                <strong>Manage Users</strong>
+                <div class="small text-muted">Approve, reject, or delete users</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-6">
+            <a href="/admin/manage/products" class="quick-link">
+              <div class="icon-box" style="background:#e8f5e9"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#2e7d32" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5 8 5.961 14.154 3.5 8.186 1.113zM15 4.239l-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923l6.5 2.6z"/></svg></div>
+              <div>
+                <strong>Review Products</strong>
+                <div class="small text-muted">Approve or delete products</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-6">
+            <a href="/admin/manage/rfqs" class="quick-link">
+              <div class="icon-box" style="background:#fff3e0"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#e65100" viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/><path d="M3 4h10v1H3V4zm0 3h10v1H3V7zm0 3h7v1H3v-1z"/></svg></div>
+              <div>
+                <strong>View All RFQs</strong>
+                <div class="small text-muted">Read-only system overview</div>
+              </div>
+            </a>
+          </div>
+          <div class="col-md-6">
+            <a href="/admin/manage/contracts" class="quick-link">
+              <div class="icon-box" style="background:#fce4ec"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#c62828" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9.5 3A1.5 1.5 0 0 0 8 4.5V6h2.5L9.5 3z"/></svg></div>
+              <div>
+                <strong>View All Contracts</strong>
+                <div class="small text-muted">Read-only system overview</div>
+              </div>
+            </a>
           </div>
         </div>
       </div>
-      <div class="col-md-6">
-        <div class="card mb-3">
-          <div class="card-body text-center">
-            <h5>Quick Links</h5>
-            <a href="/admin/manage/users" class="btn btn-outline-primary btn-sm m-1">Users</a>
-            <a href="/admin/manage/products" class="btn btn-outline-success btn-sm m-1">Product Approval</a>
-            <a href="/admin/manage/rfqs" class="btn btn-outline-info btn-sm m-1">All RFQs</a>
-            <a href="/admin/manage/contracts" class="btn btn-outline-dark btn-sm m-1">All Contracts</a>
-          </div>
-        </div>
+    </div>
+
+    <!-- Admin Permissions Note -->
+    <div class="card shadow-sm p-3 mt-4 bg-light">
+      <div class="d-flex align-items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#6c757d" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+        <small class="text-muted"><strong>Admin Permissions:</strong> You can approve/reject/delete users and products. RFQs, orders, and contracts are read-only for oversight purposes.</small>
       </div>
     </div>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

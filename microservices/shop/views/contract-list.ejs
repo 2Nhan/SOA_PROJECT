@@ -1,40 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
   <title>My Contracts - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>My Contracts</h2>
+  <div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">My Contracts</h2>
+        <p class="text-muted mb-0">Manage your supplier agreements and contracts</p>
+      </div>
+    </div>
+
     <% if (contracts.length === 0) { %>
-      <div class="alert alert-info">No contracts yet. Accept a quotation to create one.</div>
+      <div class="card border-0 shadow-sm" style="border-radius:12px;">
+        <div class="card-body text-center py-5">
+          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="#dee2e6" viewBox="0 0 16 16"><path d="M10.854 7.854a.5.5 0 0 0-.708-.708L7.5 9.793 6.354 8.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"/><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+          <h5 class="text-muted mt-3">No contracts yet</h5>
+          <p class="text-muted">Accept a quotation from an RFQ to create your first contract.</p>
+          <a href="/rfqs" class="btn btn-primary">View My RFQs</a>
+        </div>
+      </div>
     <% } else { %>
-    <table class="table table-hover mt-3">
-      <thead class="table-dark">
-        <tr><th>#</th><th>Product</th><th>Supplier</th><th>Qty</th><th>Total</th><th>Status</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        <% contracts.forEach(c => { %>
-        <tr>
-          <td><%= c.id %></td>
-          <td><%= c.product_name %></td>
-          <td><%= c.supplier_name %></td>
-          <td><%= c.quantity %></td>
-          <td>$<%= parseFloat(c.total_amount).toFixed(2) %></td>
-          <td>
-            <% if (c.status === 'draft') { %><span class="badge bg-warning">Draft</span>
-            <% } else if (c.status === 'confirmed') { %><span class="badge bg-success">Confirmed</span>
-            <% } else if (c.status === 'completed') { %><span class="badge bg-primary">Completed</span>
-            <% } else { %><span class="badge bg-danger">Cancelled</span><% } %>
-          </td>
-          <td><a href="/contracts/<%= c.id %>" class="btn btn-sm btn-primary">View</a></td>
-        </tr>
-        <% }); %>
-      </tbody>
-    </table>
+
+    <div class="row g-3 mb-4">
+      <% var draft = contracts.filter(c => c.status === 'draft').length; %>
+      <% var confirmed = contracts.filter(c => c.status === 'confirmed').length; %>
+      <% var completed = contracts.filter(c => c.status === 'completed').length; %>
+      <% var totalVal = contracts.reduce((s,c) => s + parseFloat(c.total_amount), 0); %>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-primary"><%= contracts.length %></div>
+          <div class="small text-muted">Total</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-warning"><%= draft %></div>
+          <div class="small text-muted">Draft</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-success"><%= confirmed %></div>
+          <div class="small text-muted">Confirmed</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-dark">$<%= totalVal.toFixed(0) %></div>
+          <div class="small text-muted">Total Value</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
+      <table class="table table-hover mb-0 align-middle">
+        <thead style="background:#f8f9fa;">
+          <tr><th>#</th><th>Product</th><th>Supplier</th><th>Qty</th><th>Total</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% contracts.forEach(c => { %>
+          <tr>
+            <td class="fw-semibold">#<%= c.id %></td>
+            <td><%= c.product_name %></td>
+            <td class="text-muted"><%= c.supplier_name %></td>
+            <td><%= c.quantity %></td>
+            <td class="fw-semibold">$<%= parseFloat(c.total_amount).toFixed(2) %></td>
+            <td>
+              <% if (c.status === 'draft') { %><span class="badge bg-warning bg-opacity-10 text-warning">Draft</span>
+              <% } else if (c.status === 'confirmed') { %><span class="badge bg-success bg-opacity-10 text-success">Confirmed</span>
+              <% } else if (c.status === 'completed') { %><span class="badge bg-primary bg-opacity-10 text-primary">Completed</span>
+              <% } else { %><span class="badge bg-danger bg-opacity-10 text-danger">Cancelled</span><% } %>
+            </td>
+            <td><a href="/contracts/<%= c.id %>" class="btn btn-sm btn-outline-primary">View</a></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
     <% } %>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

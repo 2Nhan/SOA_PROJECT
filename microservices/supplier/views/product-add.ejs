@@ -1,49 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Add Product - Admin</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Product - Supplier Portal</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#f5f7f5; }
+    .card { border:0; border-radius:12px; }
+    .form-label { font-weight:600; font-size:.9rem; color:#333; }
+    .upload-zone { border:2px dashed #c8e6c9; border-radius:12px; padding:2rem; text-align:center; background:#f1f8e9; cursor:pointer; transition:border-color .2s; }
+    .upload-zone:hover { border-color:#4caf50; }
+    .tip-card { background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border-radius:12px; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <a href="/admin/products" class="btn btn-secondary btn-sm mb-3">&larr; Back</a>
-    <h2>Add New Product</h2>
-    <div class="card">
-      <div class="card-body">
-        <form method="POST" action="/admin/products" enctype="multipart/form-data">
-          <input type="hidden" name="supplier_id" value="1">
-          <div class="mb-3">
-            <label class="form-label">Product Name *</label>
-            <input type="text" name="name" class="form-control" required minlength="2" maxlength="255">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Category</label>
-            <input type="text" name="category" class="form-control" maxlength="100">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Description</label>
-            <textarea name="description" class="form-control" rows="3" maxlength="2000"></textarea>
-          </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Price ($) *</label>
-              <input type="number" name="price" class="form-control" step="0.01" min="0" max="999999.99" required>
+  <div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/admin/products" class="text-success text-decoration-none">My Products</a></li>
+        <li class="breadcrumb-item active">Add New Product</li>
+      </ol>
+    </nav>
+
+    <div class="row g-4">
+      <!-- Form -->
+      <div class="col-lg-8">
+        <div class="card shadow-sm p-4">
+          <h4 class="fw-bold mb-1">Add New Product</h4>
+          <p class="text-muted mb-4">Fill in the details below to list a new product in the marketplace.</p>
+          <form method="POST" action="/admin/products" enctype="multipart/form-data">
+            <input type="hidden" name="supplier_id" value="1">
+
+            <div class="mb-3">
+              <label class="form-label">Product Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" required minlength="2" maxlength="255" placeholder="e.g. Industrial Steel Bolts M12">
             </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Stock *</label>
-              <input type="number" name="stock" class="form-control" min="0" max="1000000" required>
+
+            <div class="mb-3">
+              <label class="form-label">Category</label>
+              <input type="text" name="category" class="form-control" maxlength="100" placeholder="e.g. Hardware, Electronics, Raw Materials">
             </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Product Image</label>
-            <input type="file" name="image" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp">
-            <div class="form-text">Max 5MB. Accepted: JPEG, PNG, GIF, WebP. Uploaded to Amazon S3.</div>
-          </div>
-          <button type="submit" class="btn btn-primary">Add Product</button>
-        </form>
+
+            <div class="mb-3">
+              <label class="form-label">Description</label>
+              <textarea name="description" class="form-control" rows="4" maxlength="2000" placeholder="Describe your product specifications, materials, certifications..."></textarea>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Unit Price ($) <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text">$</span>
+                  <input type="number" name="price" class="form-control" step="0.01" min="0" max="999999.99" required placeholder="0.00">
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Stock Quantity <span class="text-danger">*</span></label>
+                <input type="number" name="stock" class="form-control" min="0" max="1000000" required placeholder="Available units">
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label">Product Image</label>
+              <div class="upload-zone" onclick="document.getElementById('imageInput').click()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="#4caf50" viewBox="0 0 16 16"><path d="M.002 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2V3zm1 9v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12zm5-6.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0z"/></svg>
+                <p class="mt-2 mb-1 fw-semibold text-success">Click to upload image</p>
+                <small class="text-muted">Max 5MB — JPEG, PNG, GIF, WebP</small>
+              </div>
+              <input type="file" name="image" id="imageInput" class="d-none" accept="image/jpeg,image/png,image/gif,image/webp">
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-success px-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+                Add Product
+              </button>
+              <a href="/admin/products" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tips Sidebar -->
+      <div class="col-lg-4">
+        <div class="tip-card p-4 mb-3">
+          <h6 class="fw-bold mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#0d4f2b" class="me-1" viewBox="0 0 16 16"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.399l-.254-.037.026-.12L8.93 6.588zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+            Tips for Listing
+          </h6>
+          <ul class="small mb-0" style="padding-left:1.2rem">
+            <li class="mb-2">Use clear, descriptive product names with specifications</li>
+            <li class="mb-2">Add high-quality images to increase buyer interest</li>
+            <li class="mb-2">Set competitive prices — buyers compare across suppliers</li>
+            <li class="mb-2">Keep stock updated to avoid order issues</li>
+            <li>Products may require admin approval before going live</li>
+          </ul>
+        </div>
+        <div class="card shadow-sm p-4">
+          <h6 class="fw-bold mb-2">Product Lifecycle</h6>
+          <div class="d-flex align-items-center mb-2"><span class="badge bg-warning me-2">Pending</span><small class="text-muted">Awaiting approval</small></div>
+          <div class="d-flex align-items-center mb-2"><span class="badge bg-success me-2">Active</span><small class="text-muted">Visible to buyers</small></div>
+          <div class="d-flex align-items-center"><span class="badge bg-secondary me-2">Inactive</span><small class="text-muted">Hidden from catalog</small></div>
+        </div>
       </div>
     </div>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.getElementById('imageInput').addEventListener('change', function() {
+      var zone = this.previousElementSibling;
+      if (this.files.length > 0) {
+        zone.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#4caf50" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/></svg><p class="mt-2 mb-0 fw-semibold text-success">' + this.files[0].name + '</p>';
+      }
+    });
+  </script>
 </body>
 </html>

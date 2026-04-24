@@ -1,62 +1,203 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
   <title>Supplier Dashboard - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    .dash-card { border:none; border-radius:12px; transition: transform 0.2s; }
+    .dash-card:hover { transform: translateY(-2px); }
+  </style>
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>Supplier Dashboard</h2>
-    <div class="row mt-3">
-      <div class="col-md-3">
-        <div class="card text-white bg-primary mb-3">
-          <div class="card-body text-center">
-            <h5>Products</h5>
-            <p>Manage your product listings</p>
-            <a href="/admin/products" class="btn btn-light btn-sm">Manage Products</a>
+  <div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Supplier Dashboard</h2>
+        <p class="text-muted mb-0">Manage your products, quotes, and orders</p>
+      </div>
+      <a href="/admin/products/add" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></svg>
+        Add Product
+      </a>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="card dash-card shadow-sm" style="border-left:4px solid #0d6efd;">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="small text-muted">Products</div>
+                <div class="fs-4 fw-bold">—</div>
+              </div>
+              <div class="bg-primary bg-opacity-10 rounded p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#0d6efd" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L10.404 2zm3.564 1.426L5.596 5 8 5.961 14.154 3.5zm3.25 1.7-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923z"/></svg>
+              </div>
+            </div>
+            <a href="/admin/products" class="small text-decoration-none">Manage →</a>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-white bg-info mb-3">
-          <div class="card-body text-center">
-            <h5>RFQs</h5>
-            <p>View and respond to RFQs</p>
-            <a href="/admin/rfqs" class="btn btn-light btn-sm">View RFQs</a>
+      <div class="col-6 col-lg-3">
+        <div class="card dash-card shadow-sm" style="border-left:4px solid #0dcaf0;">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="small text-muted">RFQs</div>
+                <div class="fs-4 fw-bold">—</div>
+              </div>
+              <div class="bg-info bg-opacity-10 rounded p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#0dcaf0" viewBox="0 0 16 16"><path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/></svg>
+              </div>
+            </div>
+            <a href="/admin/rfqs" class="small text-decoration-none">View →</a>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-white bg-dark mb-3">
-          <div class="card-body text-center">
-            <h5>Contracts</h5>
-            <p>Confirm and manage contracts</p>
-            <a href="/admin/contracts" class="btn btn-light btn-sm">View Contracts</a>
+      <div class="col-6 col-lg-3">
+        <div class="card dash-card shadow-sm" style="border-left:4px solid #212529;">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="small text-muted">Contracts</div>
+                <div class="fs-4 fw-bold">—</div>
+              </div>
+              <div class="bg-dark bg-opacity-10 rounded p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#212529" viewBox="0 0 16 16"><path d="M10.854 7.854a.5.5 0 0 0-.708-.708L7.5 9.793 6.354 8.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"/><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+              </div>
+            </div>
+            <a href="/admin/contracts" class="small text-decoration-none">View →</a>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-white bg-success mb-3">
-          <div class="card-body text-center">
-            <h5>Orders</h5>
-            <p>View and process orders</p>
-            <a href="/admin/orders" class="btn btn-light btn-sm">Manage Orders</a>
+      <div class="col-6 col-lg-3">
+        <div class="card dash-card shadow-sm" style="border-left:4px solid #198754;">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="small text-muted">Orders</div>
+                <div class="fs-4 fw-bold">—</div>
+              </div>
+              <div class="bg-success bg-opacity-10 rounded p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#198754" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5"/></svg>
+              </div>
+            </div>
+            <a href="/admin/orders" class="small text-decoration-none">Manage →</a>
           </div>
         </div>
       </div>
     </div>
-    <div class="row">
-      <div class="col-md-12">
-        <div class="card border-warning">
-          <div class="card-header bg-warning">Admin Panel</div>
-          <div class="card-body">
-            <p>Manage users, approve products, and monitor system activity.</p>
-            <a href="/admin/manage" class="btn btn-warning">Go to Admin Panel</a>
+
+    <!-- Quick Actions -->
+    <div class="row g-4">
+      <div class="col-md-8">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+          <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+            <h5 class="fw-bold mb-0">Quick Actions</h5>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <a href="/admin/products/add" class="text-decoration-none">
+                  <div class="border rounded p-3 d-flex align-items-center h-100" style="transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                    <div class="bg-primary bg-opacity-10 rounded p-2 me-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#0d6efd" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></svg>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-dark">Add New Product</div>
+                      <div class="small text-muted">List a new product for buyers</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+              <div class="col-sm-6">
+                <a href="/admin/rfqs" class="text-decoration-none">
+                  <div class="border rounded p-3 d-flex align-items-center h-100" style="transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                    <div class="bg-warning bg-opacity-10 rounded p-2 me-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#ffc107" viewBox="0 0 16 16"><path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1z"/><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/></svg>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-dark">Review RFQs</div>
+                      <div class="small text-muted">Respond to buyer requests</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+              <div class="col-sm-6">
+                <a href="/admin/contracts" class="text-decoration-none">
+                  <div class="border rounded p-3 d-flex align-items-center h-100" style="transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                    <div class="bg-dark bg-opacity-10 rounded p-2 me-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#212529" viewBox="0 0 16 16"><path d="M10.854 7.854a.5.5 0 0 0-.708-.708L7.5 9.793 6.354 8.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"/><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-dark">Manage Contracts</div>
+                      <div class="small text-muted">Confirm pending contracts</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+              <div class="col-sm-6">
+                <a href="/admin/orders" class="text-decoration-none">
+                  <div class="border rounded p-3 d-flex align-items-center h-100" style="transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                    <div class="bg-success bg-opacity-10 rounded p-2 me-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#198754" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5"/></svg>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-dark">Process Orders</div>
+                      <div class="small text-muted">Confirm and fulfill orders</div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+          <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+            <h5 class="fw-bold mb-0">Workflow</h5>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <div class="d-flex align-items-start mb-3">
+              <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width:28px;height:28px;font-size:12px;">1</div>
+              <div class="small"><strong>List Products</strong><br><span class="text-muted">Add your products with pricing</span></div>
+            </div>
+            <div class="d-flex align-items-start mb-3">
+              <div class="rounded-circle bg-info text-white d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width:28px;height:28px;font-size:12px;">2</div>
+              <div class="small"><strong>Quote RFQs</strong><br><span class="text-muted">Respond with competitive pricing</span></div>
+            </div>
+            <div class="d-flex align-items-start mb-3">
+              <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width:28px;height:28px;font-size:12px;">3</div>
+              <div class="small"><strong>Confirm Contracts</strong><br><span class="text-muted">Finalize accepted agreements</span></div>
+            </div>
+            <div class="d-flex align-items-start">
+              <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width:28px;height:28px;font-size:12px;">4</div>
+              <div class="small"><strong>Fulfill Orders</strong><br><span class="text-muted">Confirm, ship, and collect payment</span></div>
+            </div>
+          </div>
+        </div>
+
+        <% if (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin') { %>
+        <div class="card border-0 shadow-sm mt-3" style="border-radius:12px; border-left:4px solid #ffc107 !important;">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center">
+              <span class="me-2">🛡️</span>
+              <div class="flex-grow-1">
+                <div class="fw-semibold small">Admin Panel</div>
+                <div class="text-muted" style="font-size:11px;">Manage users & approve products</div>
+              </div>
+              <a href="/admin/manage" class="btn btn-warning btn-sm">Open</a>
+            </div>
+          </div>
+        </div>
+        <% } %>
       </div>
     </div>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

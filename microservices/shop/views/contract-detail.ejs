@@ -1,44 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
-  <title>Contract Detail - B2B Marketplace</title>
+  <title>Contract #<%= contract.id %> - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>Contract #<%= contract.id %></h2>
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="row">
-          <div class="col-md-6">
-            <p><strong>Product:</strong> <%= contract.product_name %></p>
-            <p><strong>Supplier:</strong> <%= contract.supplier_name %></p>
-            <p><strong>Shop:</strong> <%= contract.shop_name %></p>
-            <p><strong>Quantity:</strong> <%= contract.quantity %></p>
-          </div>
-          <div class="col-md-6">
-            <p><strong>Unit Price:</strong> $<%= parseFloat(contract.unit_price).toFixed(2) %></p>
-            <p><strong>Total Amount:</strong> $<%= parseFloat(contract.total_amount).toFixed(2) %></p>
-            <p><strong>Delivery:</strong> <%= contract.delivery_days %> days</p>
-            <p><strong>Status:</strong>
-              <% if (contract.status === 'draft') { %><span class="badge bg-warning">Draft - Awaiting Supplier Confirmation</span>
-              <% } else if (contract.status === 'confirmed') { %><span class="badge bg-success">Confirmed</span>
-              <% } else if (contract.status === 'completed') { %><span class="badge bg-primary">Completed</span>
-              <% } else { %><span class="badge bg-danger">Cancelled</span><% } %>
-            </p>
-            <p><strong>Created:</strong> <%= new Date(contract.created_at).toLocaleDateString() %></p>
-          </div>
-        </div>
-        <% if (contract.status === 'confirmed') { %>
-        <hr>
-        <form action="/contracts/<%= contract.id %>/order" method="POST">
-          <button class="btn btn-success btn-lg">Create Order from Contract</button>
-        </form>
-        <% } %>
+  <div class="container mt-4 mb-5">
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="/contracts" class="text-decoration-none">My Contracts</a></li>
+        <li class="breadcrumb-item active">Contract #<%= contract.id %></li>
+      </ol>
+    </nav>
+
+    <div class="alert py-2 mb-4
+      <% if (contract.status === 'draft') { %> alert-warning
+      <% } else if (contract.status === 'confirmed') { %> alert-success
+      <% } else if (contract.status === 'completed') { %> alert-primary
+      <% } else { %> alert-danger <% } %>
+    ">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">
+          <% if (contract.status === 'draft') { %>⏳ Awaiting supplier confirmation
+          <% } else if (contract.status === 'confirmed') { %>✅ Contract confirmed — ready to create order
+          <% } else if (contract.status === 'completed') { %>🎉 Contract completed
+          <% } else { %>❌ Contract cancelled<% } %>
+        </span>
+        <span class="badge bg-white text-dark">Contract #<%= contract.id %></span>
       </div>
     </div>
-    <a href="/contracts" class="btn btn-secondary">Back to Contracts</a>
+
+    <div class="row g-4">
+      <div class="col-md-8">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+          <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+            <h5 class="fw-bold mb-0">Contract Details</h5>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <div class="small text-muted">Product</div>
+                <div class="fw-semibold"><%= contract.product_name %></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="small text-muted">Supplier</div>
+                <div class="fw-semibold"><%= contract.supplier_name %></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="small text-muted">Shop</div>
+                <div class="fw-semibold"><%= contract.shop_name %></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="small text-muted">Quantity</div>
+                <div class="fw-semibold"><%= contract.quantity %> units</div>
+              </div>
+              <div class="col-sm-6">
+                <div class="small text-muted">Unit Price</div>
+                <div class="fw-semibold">$<%= parseFloat(contract.unit_price).toFixed(2) %></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="small text-muted">Delivery Time</div>
+                <div class="fw-semibold"><%= contract.delivery_days %> days</div>
+              </div>
+              <div class="col-12">
+                <div class="small text-muted">Created</div>
+                <div class="small"><%= new Date(contract.created_at).toLocaleDateString() %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+          <div class="card-body p-4 text-center">
+            <div class="small text-muted mb-1">Total Contract Value</div>
+            <div class="fs-2 fw-bold text-success mb-1">$<%= parseFloat(contract.total_amount).toFixed(2) %></div>
+            <div class="small text-muted mb-4"><%= contract.quantity %> × $<%= parseFloat(contract.unit_price).toFixed(2) %></div>
+            <% if (contract.status === 'confirmed') { %>
+            <form action="/contracts/<%= contract.id %>/order" method="POST">
+              <button class="btn btn-success w-100">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5"/></svg>
+                Create Order from Contract
+              </button>
+            </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <a href="/contracts" class="btn btn-outline-secondary">← Back to Contracts</a>
+    </div>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

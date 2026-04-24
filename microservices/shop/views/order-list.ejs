@@ -1,39 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
   <title>My Orders - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>My Orders</h2>
+  <div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">My Orders</h2>
+        <p class="text-muted mb-0">Track your purchases and order status</p>
+      </div>
+      <a href="/products" class="btn btn-success">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></svg>
+        New Order
+      </a>
+    </div>
+
     <% if (orders.length === 0) { %>
-      <p class="text-muted">No orders yet. <a href="/products">Browse products</a> to place an order.</p>
+      <div class="card border-0 shadow-sm" style="border-radius:12px;">
+        <div class="card-body text-center py-5">
+          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="#dee2e6" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5"/></svg>
+          <h5 class="text-muted mt-3">No orders yet</h5>
+          <p class="text-muted">Browse products to place your first order.</p>
+          <a href="/products" class="btn btn-primary">Browse Products</a>
+        </div>
+      </div>
     <% } else { %>
-      <table class="table table-striped">
-        <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th><th></th></tr></thead>
+
+    <!-- Summary -->
+    <div class="row g-3 mb-4">
+      <% var pendingO = orders.filter(o => o.status === 'pending').length; %>
+      <% var confirmedO = orders.filter(o => o.status === 'confirmed').length; %>
+      <% var paidO = orders.filter(o => o.status === 'paid').length; %>
+      <% var totalSpent = orders.filter(o => o.status === 'paid').reduce((s,o) => s + parseFloat(o.total_price), 0); %>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-primary"><%= orders.length %></div>
+          <div class="small text-muted">Total Orders</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-warning"><%= pendingO %></div>
+          <div class="small text-muted">Pending</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-info"><%= confirmedO %></div>
+          <div class="small text-muted">Confirmed</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3" style="border-radius:12px;">
+          <div class="fs-3 fw-bold text-success">$<%= totalSpent.toFixed(0) %></div>
+          <div class="small text-muted">Total Paid</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
+      <table class="table table-hover mb-0 align-middle">
+        <thead style="background:#f8f9fa;">
+          <tr><th>#</th><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th><th></th></tr>
+        </thead>
         <tbody>
           <% orders.forEach(function(o) { %>
-            <tr>
-              <td><%= o.id %></td>
-              <td><%= o.product_name %></td>
-              <td><%= o.quantity %></td>
-              <td>$<%= parseFloat(o.total_price).toFixed(2) %></td>
-              <td>
-                <% if (o.status === 'pending') { %><span class="badge bg-warning">Pending</span>
-                <% } else if (o.status === 'confirmed') { %><span class="badge bg-info">Confirmed</span>
-                <% } else if (o.status === 'paid') { %><span class="badge bg-success">Paid</span>
-                <% } else if (o.status === 'cancelled') { %><span class="badge bg-danger">Cancelled</span>
-                <% } else { %><span class="badge bg-secondary"><%= o.status %></span><% } %>
-              </td>
-              <td><%= new Date(o.created_at).toLocaleDateString() %></td>
-              <td><a href="/orders/<%= o.id %>" class="btn btn-sm btn-outline-primary">View</a></td>
-            </tr>
+          <tr>
+            <td class="fw-semibold">#<%= o.id %></td>
+            <td><%= o.product_name %></td>
+            <td><%= o.quantity %></td>
+            <td class="fw-semibold">$<%= parseFloat(o.total_price).toFixed(2) %></td>
+            <td>
+              <% if (o.status === 'pending') { %><span class="badge bg-warning bg-opacity-10 text-warning">Pending</span>
+              <% } else if (o.status === 'confirmed') { %><span class="badge bg-info bg-opacity-10 text-info">Confirmed</span>
+              <% } else if (o.status === 'paid') { %><span class="badge bg-success bg-opacity-10 text-success">Paid</span>
+              <% } else if (o.status === 'cancelled') { %><span class="badge bg-danger bg-opacity-10 text-danger">Cancelled</span>
+              <% } else { %><span class="badge bg-secondary"><%= o.status %></span><% } %>
+            </td>
+            <td class="text-muted small"><%= new Date(o.created_at).toLocaleDateString() %></td>
+            <td><a href="/orders/<%= o.id %>" class="btn btn-sm btn-outline-primary">View</a></td>
+          </tr>
           <% }); %>
         </tbody>
       </table>
+    </div>
     <% } %>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

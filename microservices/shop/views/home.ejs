@@ -1,56 +1,276 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
   <title>B2B Marketplace - Shop</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    .hero-section {
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      color: white;
+      padding: 80px 0 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-section::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .feature-card {
+      border: none;
+      border-radius: 12px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      height: 100%;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+    }
+    .feature-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .stat-card {
+      border: none;
+      border-radius: 12px;
+      background: white;
+      text-align: center;
+      padding: 24px;
+    }
+  </style>
 </head>
-<body>
+<body class="d-flex flex-column h-100">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <div class="jumbotron text-center p-5 bg-light rounded">
-      <h1>Welcome to B2B Marketplace</h1>
-      <p class="lead">Browse products, send RFQs, negotiate quotes, and manage contracts</p>
-      <a href="/products" class="btn btn-primary btn-lg">Browse Products</a>
-      <a href="/rfqs" class="btn btn-outline-info btn-lg ms-2">My RFQs</a>
-    </div>
-    <div class="row mt-4">
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body text-center">
-            <h5>Products</h5>
-            <p>Browse and search supplier products</p>
-            <a href="/products" class="btn btn-sm btn-primary">View Products</a>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="container position-relative">
+      <div class="row align-items-center">
+        <div class="col-lg-7">
+          <h1 class="display-4 fw-bold mb-3">Streamline Your B2B Procurement</h1>
+          <p class="lead mb-4 text-white-50">Connect with verified suppliers, negotiate the best deals through RFQs, manage contracts, and track orders — all in one platform.</p>
+          <div class="d-flex flex-wrap gap-3">
+            <a href="/products" class="btn btn-primary btn-lg px-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-search me-2" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/></svg>
+              Browse Products
+            </a>
+            <a href="/rfqs" class="btn btn-outline-light btn-lg px-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-send me-2" viewBox="0 0 16 16"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"/></svg>
+              Send an RFQ
+            </a>
           </div>
         </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body text-center">
-            <h5>RFQs</h5>
-            <p>Send requests for quotation</p>
-            <a href="/rfqs" class="btn btn-sm btn-info">My RFQs</a>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body text-center">
-            <h5>Contracts</h5>
-            <p>View and manage contracts</p>
-            <a href="/contracts" class="btn btn-sm btn-dark">Contracts</a>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body text-center">
-            <h5>Orders</h5>
-            <p>View order history and status</p>
-            <a href="/orders" class="btn btn-sm btn-success">My Orders</a>
-          </div>
+        <div class="col-lg-5 d-none d-lg-block text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" fill="rgba(255,255,255,0.08)" viewBox="0 0 16 16">
+            <path d="M2.97 1.35A1 1 0 0 1 3.73 1h8.54a1 1 0 0 1 .76.35l2.609 3.044A1.5 1.5 0 0 1 16 5.37v.255a2.375 2.375 0 0 1-4.25 1.458A2.37 2.37 0 0 1 9.875 8 2.37 2.37 0 0 1 8 7.083 2.37 2.37 0 0 1 6.125 8a2.37 2.37 0 0 1-1.875-.917A2.375 2.375 0 0 1 0 5.625V5.37a1.5 1.5 0 0 1 .361-.976zm1.78 4.275a1.375 1.375 0 0 0 2.75 0 .5.5 0 0 1 1 0 1.375 1.375 0 0 0 2.75 0 .5.5 0 0 1 1 0 1.375 1.375 0 1 0 2.75 0V5.37a.5.5 0 0 0-.12-.325L12.27 2H3.73L1.12 5.045A.5.5 0 0 0 1 5.37v.255a1.375 1.375 0 0 0 2.75 0 .5.5 0 0 1 1 0M1.5 8.5A.5.5 0 0 1 2 9v6h1v-5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v5h6V9a.5.5 0 0 1 1 0v6h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1V9a.5.5 0 0 1 .5-.5M4 15h3v-5H4zm5-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1zm1 0v3h2v-3z"/>
+          </svg>
         </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- Feature Cards -->
+  <section class="py-5 bg-light">
+    <div class="container">
+      <div class="text-center mb-5">
+        <h2 class="fw-bold">Everything You Need in One Place</h2>
+        <p class="text-muted">Manage your entire procurement workflow from start to finish</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="card feature-card shadow-sm">
+            <div class="card-body p-4">
+              <div class="feature-icon bg-primary bg-opacity-10 text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L10.404 2zm3.564 1.426L5.596 5 8 5.961 14.154 3.5zm3.25 1.7-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923z"/></svg>
+              </div>
+              <h5 class="fw-bold">Product Catalog</h5>
+              <p class="text-muted small mb-3">Browse a wide range of products from verified suppliers with real-time stock and pricing.</p>
+              <a href="/products" class="btn btn-primary btn-sm w-100">Browse Products</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="card feature-card shadow-sm">
+            <div class="card-body p-4">
+              <div class="feature-icon bg-info bg-opacity-10 text-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/><path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/></svg>
+              </div>
+              <h5 class="fw-bold">Request for Quotation</h5>
+              <p class="text-muted small mb-3">Send RFQs to suppliers and receive competitive quotes tailored to your volume needs.</p>
+              <a href="/rfqs" class="btn btn-info btn-sm w-100 text-white">My RFQs</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="card feature-card shadow-sm">
+            <div class="card-body p-4">
+              <div class="feature-icon bg-dark bg-opacity-10 text-dark">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M10.854 7.854a.5.5 0 0 0-.708-.708L7.5 9.793 6.354 8.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"/><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/></svg>
+              </div>
+              <h5 class="fw-bold">Smart Contracts</h5>
+              <p class="text-muted small mb-3">Formalize agreements with auto-generated contracts from accepted quotations.</p>
+              <a href="/contracts" class="btn btn-dark btn-sm w-100">View Contracts</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="card feature-card shadow-sm">
+            <div class="card-body p-4">
+              <div class="feature-icon bg-success bg-opacity-10 text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l.84 4.479 9.144-.459L13.89 4z"/></svg>
+              </div>
+              <h5 class="fw-bold">Order Management</h5>
+              <p class="text-muted small mb-3">Place orders, track status, and manage payments with full transaction history.</p>
+              <a href="/orders" class="btn btn-success btn-sm w-100">My Orders</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="py-5">
+    <div class="container">
+      <div class="text-center mb-5">
+        <h2 class="fw-bold">How It Works</h2>
+        <p class="text-muted">Simple 4-step procurement process</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="d-flex align-items-start">
+            <div class="step-number bg-primary text-white me-3">1</div>
+            <div>
+              <h6 class="fw-bold">Browse & Discover</h6>
+              <p class="text-muted small mb-0">Search the product catalog to find what your business needs from verified suppliers.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="d-flex align-items-start">
+            <div class="step-number bg-info text-white me-3">2</div>
+            <div>
+              <h6 class="fw-bold">Request Quotes</h6>
+              <p class="text-muted small mb-0">Send RFQs with your desired quantity and receive competitive pricing from suppliers.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="d-flex align-items-start">
+            <div class="step-number bg-dark text-white me-3">3</div>
+            <div>
+              <h6 class="fw-bold">Sign Contracts</h6>
+              <p class="text-muted small mb-0">Accept the best quote and a contract is automatically generated for both parties.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="d-flex align-items-start">
+            <div class="step-number bg-success text-white me-3">4</div>
+            <div>
+              <h6 class="fw-bold">Order & Pay</h6>
+              <p class="text-muted small mb-0">Create orders from contracts, track delivery, and process secure payments.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Info -->
+  <section class="py-5 bg-light">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-lg-6 mb-4 mb-lg-0">
+          <h2 class="fw-bold mb-3">Built on Microservices Architecture</h2>
+          <p class="text-muted">This platform demonstrates a real-world Service-Oriented Architecture (SOA) with independent, loosely-coupled microservices communicating via REST APIs.</p>
+          <ul class="list-unstyled">
+            <li class="d-flex align-items-center mb-2">
+              <span class="badge bg-primary me-2">Shop Service</span>
+              <small class="text-muted">Handles buyer browsing, RFQs, orders, and contracts</small>
+            </li>
+            <li class="d-flex align-items-center mb-2">
+              <span class="badge bg-success me-2">Supplier Service</span>
+              <small class="text-muted">Manages products, quotes, order fulfillment, and payments</small>
+            </li>
+            <li class="d-flex align-items-center mb-2">
+              <span class="badge bg-secondary me-2">Saga Pattern</span>
+              <small class="text-muted">Compensating transactions for payment failure handling</small>
+            </li>
+          </ul>
+        </div>
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+              <h6 class="fw-bold mb-3">Technology Stack</h6>
+              <div class="row g-3">
+                <div class="col-6">
+                  <div class="d-flex align-items-center p-2 bg-light rounded">
+                    <span class="me-2">🟢</span>
+                    <div><strong class="small">Node.js</strong><br><small class="text-muted">Runtime</small></div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="d-flex align-items-center p-2 bg-light rounded">
+                    <span class="me-2">🚀</span>
+                    <div><strong class="small">Express.js</strong><br><small class="text-muted">Web Framework</small></div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="d-flex align-items-center p-2 bg-light rounded">
+                    <span class="me-2">🐘</span>
+                    <div><strong class="small">PostgreSQL</strong><br><small class="text-muted">Database</small></div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="d-flex align-items-center p-2 bg-light rounded">
+                    <span class="me-2">🐳</span>
+                    <div><strong class="small">Docker</strong><br><small class="text-muted">Containerization</small></div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="d-flex align-items-center p-2 bg-light rounded">
+                    <span class="me-2">☁️</span>
+                    <div><strong class="small">AWS S3</strong><br><small class="text-muted">Image Storage</small></div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="d-flex align-items-center p-2 bg-light rounded">
+                    <span class="me-2">📄</span>
+                    <div><strong class="small">EJS</strong><br><small class="text-muted">Templates</small></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

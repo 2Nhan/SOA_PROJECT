@@ -1,42 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
   <title><%= product.name %> - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    .product-img-placeholder { height: 100%; min-height: 300px; background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%); display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+  </style>
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <a href="/products" class="btn btn-secondary btn-sm mb-3">&larr; Back to Products</a>
-    <div class="card">
+  <div class="container mt-4 mb-5">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+        <li class="breadcrumb-item"><a href="/products" class="text-decoration-none">Products</a></li>
+        <li class="breadcrumb-item active"><%= product.name %></li>
+      </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
       <div class="row g-0">
-        <% if (product.image_url) { %>
-          <div class="col-md-5">
-            <img src="<%= product.image_url %>" class="img-fluid rounded-start" alt="<%= product.name %>" style="width:100%; height:100%; object-fit:cover; max-height:400px;">
-          </div>
-        <% } %>
-        <div class="col-md-<%= product.image_url ? '7' : '12' %>">
-          <div class="card-body">
-            <h2><%= product.name %></h2>
-            <span class="badge bg-info"><%= product.category %></span>
-            <hr>
-            <p><%= product.description %></p>
-            <table class="table table-bordered w-75">
-              <tr><th>Price</th><td class="text-success fw-bold">$<%= parseFloat(product.price).toFixed(2) %></td></tr>
-              <tr><th>Stock</th><td><%= product.stock %></td></tr>
-              <tr><th>Supplier</th><td><%= product.supplier_name %></td></tr>
-            </table>
-            <% if (product.stock > 0) { %>
-              <a href="/orders/new/<%= product.id %>" class="btn btn-success">Place Order</a>
-              <a href="/rfqs/new/<%= product.id %>" class="btn btn-outline-primary ms-2">Send RFQ</a>
-            <% } else { %>
-              <button class="btn btn-secondary" disabled>Out of Stock</button>
-              <a href="/rfqs/new/<%= product.id %>" class="btn btn-outline-primary ms-2">Send RFQ</a>
-            <% } %>
+        <div class="col-md-5">
+          <% if (product.image_url) { %>
+            <img src="<%= product.image_url %>" class="img-fluid w-100" alt="<%= product.name %>" style="height:100%; min-height:300px; object-fit:cover;">
+          <% } else { %>
+            <div class="product-img-placeholder">
+              <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="#dee2e6" viewBox="0 0 16 16"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L10.404 2zm3.564 1.426L5.596 5 8 5.961 14.154 3.5zm3.25 1.7-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923z"/></svg>
+            </div>
+          <% } %>
+        </div>
+        <div class="col-md-7">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="badge bg-info"><%= product.category %></span>
+              <span class="small text-muted">
+                <% if (product.stock > 0) { %>
+                  <span class="text-success fw-semibold">● In Stock</span>
+                <% } else { %>
+                  <span class="text-danger fw-semibold">● Out of Stock</span>
+                <% } %>
+              </span>
+            </div>
+            <h2 class="fw-bold mb-3"><%= product.name %></h2>
+            <p class="text-muted"><%= product.description %></p>
+
+            <div class="bg-light rounded p-3 mb-4">
+              <div class="row text-center">
+                <div class="col-4">
+                  <div class="small text-muted">Unit Price</div>
+                  <div class="fs-4 fw-bold text-success">$<%= parseFloat(product.price).toFixed(2) %></div>
+                </div>
+                <div class="col-4">
+                  <div class="small text-muted">Available Stock</div>
+                  <div class="fs-4 fw-bold"><%= product.stock %></div>
+                </div>
+                <div class="col-4">
+                  <div class="small text-muted">Supplier</div>
+                  <div class="fw-semibold small mt-1"><%= product.supplier_name %></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <% if (product.stock > 0) { %>
+                <a href="/orders/new/<%= product.id %>" class="btn btn-success px-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5"/></svg>
+                  Place Order
+                </a>
+              <% } else { %>
+                <button class="btn btn-secondary px-4" disabled>Out of Stock</button>
+              <% } %>
+              <a href="/rfqs/new/<%= product.id %>" class="btn btn-outline-primary px-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"/></svg>
+                Send RFQ
+              </a>
+              <a href="/products" class="btn btn-outline-secondary px-4">← Back to Products</a>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

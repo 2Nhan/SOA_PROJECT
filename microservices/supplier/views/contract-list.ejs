@@ -1,40 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Contracts - Supplier</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contracts - Supplier Portal</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#f5f7f5; }
+    .card { border:0; border-radius:12px; }
+    .stat-card { transition:transform .2s; }
+    .stat-card:hover { transform:translateY(-3px); }
+    .table th { font-weight:600; font-size:.85rem; text-transform:uppercase; letter-spacing:.5px; color:#555; border-bottom:2px solid #dee2e6; }
+    .table td { vertical-align:middle; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>My Contracts</h2>
+  <div class="container py-4">
+    <div class="mb-4">
+      <h3 class="fw-bold mb-1">My Contracts</h3>
+      <p class="text-muted mb-0">View and manage your supply contracts</p>
+    </div>
+
+    <% var draft=0, confirmed=0, totalVal=0;
+       contracts.forEach(function(c){ if(c.status==='draft') draft++; else if(c.status==='confirmed') confirmed++; totalVal+=parseFloat(c.total_amount)||0; }); %>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-success"><%= contracts.length %></div>
+          <small class="text-muted">Total Contracts</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-warning"><%= draft %></div>
+          <small class="text-muted">Needs Confirmation</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-primary"><%= confirmed %></div>
+          <small class="text-muted">Confirmed</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold" style="color:#0d4f2b">$<%= totalVal.toFixed(0) %></div>
+          <small class="text-muted">Total Value</small>
+        </div>
+      </div>
+    </div>
+
     <% if (contracts.length === 0) { %>
-      <div class="alert alert-info">No contracts yet.</div>
+      <div class="card shadow-sm p-5 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="#aaa" class="mx-auto mb-3" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9.5 3A1.5 1.5 0 0 0 8 4.5V6h2.5L9.5 3z"/></svg>
+        <h5 class="text-muted">No contracts yet</h5>
+        <p class="text-muted">Contracts are created after buyers accept your RFQ quotes.</p>
+      </div>
     <% } else { %>
-    <table class="table table-hover mt-3">
-      <thead class="table-dark">
-        <tr><th>#</th><th>Product</th><th>Shop</th><th>Qty</th><th>Total</th><th>Status</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        <% contracts.forEach(c => { %>
-        <tr>
-          <td><%= c.id %></td>
-          <td><%= c.product_name %></td>
-          <td><%= c.shop_name %></td>
-          <td><%= c.quantity %></td>
-          <td>$<%= parseFloat(c.total_amount).toFixed(2) %></td>
-          <td>
-            <% if (c.status === 'draft') { %><span class="badge bg-warning">Needs Confirmation</span>
-            <% } else if (c.status === 'confirmed') { %><span class="badge bg-success">Confirmed</span>
-            <% } else if (c.status === 'completed') { %><span class="badge bg-primary">Completed</span>
-            <% } else { %><span class="badge bg-danger">Cancelled</span><% } %>
-          </td>
-          <td><a href="/admin/contracts/<%= c.id %>" class="btn btn-sm btn-primary">View</a></td>
-        </tr>
-        <% }); %>
-      </tbody>
-    </table>
+      <div class="card shadow-sm">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="bg-light">
+              <tr><th>#</th><th>Product</th><th>Buyer</th><th>Qty</th><th>Total</th><th>Status</th><th class="text-end">Action</th></tr>
+            </thead>
+            <tbody>
+              <% contracts.forEach(function(c) { %>
+              <tr>
+                <td class="fw-semibold">#<%= c.id %></td>
+                <td><%= c.product_name %></td>
+                <td><%= c.shop_name %></td>
+                <td><%= c.quantity %></td>
+                <td class="fw-semibold">$<%= parseFloat(c.total_amount).toFixed(2) %></td>
+                <td>
+                  <% if (c.status === 'draft') { %><span class="badge bg-warning">Needs Confirmation</span>
+                  <% } else if (c.status === 'confirmed') { %><span class="badge bg-success">Confirmed</span>
+                  <% } else if (c.status === 'completed') { %><span class="badge bg-primary">Completed</span>
+                  <% } else { %><span class="badge bg-danger">Cancelled</span><% } %>
+                </td>
+                <td class="text-end">
+                  <a href="/admin/contracts/<%= c.id %>" class="btn btn-sm <%= c.status === 'draft' ? 'btn-success' : 'btn-outline-primary' %>">
+                    <%= c.status === 'draft' ? 'Review' : 'View' %>
+                  </a>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     <% } %>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

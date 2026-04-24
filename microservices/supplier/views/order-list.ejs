@@ -1,40 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Orders - Admin</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders - Supplier Portal</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#f5f7f5; }
+    .card { border:0; border-radius:12px; }
+    .stat-card { transition:transform .2s; }
+    .stat-card:hover { transform:translateY(-3px); }
+    .table th { font-weight:600; font-size:.85rem; text-transform:uppercase; letter-spacing:.5px; color:#555; border-bottom:2px solid #dee2e6; }
+    .table td { vertical-align:middle; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>Orders Management</h2>
+  <div class="container py-4">
+    <div class="mb-4">
+      <h3 class="fw-bold mb-1">Orders Management</h3>
+      <p class="text-muted mb-0">Track and manage incoming purchase orders</p>
+    </div>
+
+    <% var pending=0, confirmed=0, paid=0, totalRev=0;
+       orders.forEach(function(o){ if(o.status==='pending') pending++; else if(o.status==='confirmed') confirmed++; else if(o.status==='paid'){ paid++; totalRev+=parseFloat(o.total_price)||0; } }); %>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-success"><%= orders.length %></div>
+          <small class="text-muted">Total Orders</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-warning"><%= pending %></div>
+          <small class="text-muted">Pending</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-info"><%= confirmed %></div>
+          <small class="text-muted">Confirmed</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm stat-card p-3 text-center">
+          <div class="fs-3 fw-bold text-primary">$<%= totalRev.toFixed(0) %></div>
+          <small class="text-muted">Revenue (Paid)</small>
+        </div>
+      </div>
+    </div>
+
     <% if (orders.length === 0) { %>
-      <p class="text-muted">No orders yet.</p>
+      <div class="card shadow-sm p-5 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="#aaa" class="mx-auto mb-3" viewBox="0 0 16 16"><path d="M0 2.5A.5.5 0 0 1 .5 2H2a.5.5 0 0 1 .485.379L2.89 4H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 13H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+        <h5 class="text-muted">No orders yet</h5>
+        <p class="text-muted">Orders from buyers will appear here once placed.</p>
+      </div>
     <% } else { %>
-      <table class="table table-striped">
-        <thead><tr><th>#</th><th>Product</th><th>Shop</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody>
-          <% orders.forEach(function(o) { %>
-            <tr>
-              <td><%= o.id %></td>
-              <td><%= o.product_name %></td>
-              <td><%= o.shop_name %></td>
-              <td><%= o.quantity %></td>
-              <td>$<%= parseFloat(o.total_price).toFixed(2) %></td>
-              <td>
-                <% if (o.status === 'pending') { %><span class="badge bg-warning">Pending</span>
-                <% } else if (o.status === 'confirmed') { %><span class="badge bg-info">Confirmed</span>
-                <% } else if (o.status === 'paid') { %><span class="badge bg-success">Paid</span>
-                <% } else if (o.status === 'cancelled') { %><span class="badge bg-danger">Cancelled</span>
-                <% } else { %><span class="badge bg-secondary"><%= o.status %></span><% } %>
-              </td>
-              <td><%= new Date(o.created_at).toLocaleDateString() %></td>
-              <td><a href="/admin/orders/<%= o.id %>" class="btn btn-sm btn-outline-primary">Manage</a></td>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
+      <div class="card shadow-sm">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="bg-light">
+              <tr><th>#</th><th>Product</th><th>Buyer</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th><th class="text-end">Action</th></tr>
+            </thead>
+            <tbody>
+              <% orders.forEach(function(o) { %>
+              <tr>
+                <td class="fw-semibold">#<%= o.id %></td>
+                <td><%= o.product_name %></td>
+                <td><%= o.shop_name %></td>
+                <td><%= o.quantity %></td>
+                <td class="fw-semibold">$<%= parseFloat(o.total_price).toFixed(2) %></td>
+                <td>
+                  <% if (o.status === 'pending') { %><span class="badge bg-warning">Pending</span>
+                  <% } else if (o.status === 'confirmed') { %><span class="badge bg-info">Confirmed</span>
+                  <% } else if (o.status === 'paid') { %><span class="badge bg-success">Paid</span>
+                  <% } else if (o.status === 'cancelled') { %><span class="badge bg-danger">Cancelled</span>
+                  <% } else { %><span class="badge bg-secondary"><%= o.status %></span><% } %>
+                </td>
+                <td><%= new Date(o.created_at).toLocaleDateString() %></td>
+                <td class="text-end">
+                  <a href="/admin/orders/<%= o.id %>" class="btn btn-sm <%= o.status === 'pending' ? 'btn-success' : 'btn-outline-primary' %>">
+                    <%= o.status === 'pending' ? 'Manage' : 'View' %>
+                  </a>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     <% } %>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

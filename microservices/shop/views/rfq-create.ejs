@@ -1,33 +1,79 @@
 <!DOCTYPE html>
-<html>
+<html class="h-100">
 <head>
   <title>Send RFQ - B2B Marketplace</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
-<body>
+<body class="d-flex flex-column h-100 bg-light">
   <%- include('partials/nav') %>
-  <div class="container mt-4">
-    <h2>Request for Quotation</h2>
-    <div class="card mb-3">
-      <div class="card-body">
-        <h5><%= product.name %></h5>
-        <p>List Price: $<%= parseFloat(product.price).toFixed(2) %> | Stock: <%= product.stock %></p>
+  <div class="container mt-4 mb-5">
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="/products" class="text-decoration-none">Products</a></li>
+        <li class="breadcrumb-item"><a href="/products/<%= product.id %>" class="text-decoration-none"><%= product.name %></a></li>
+        <li class="breadcrumb-item active">Send RFQ</li>
+      </ol>
+    </nav>
+
+    <div class="row g-4">
+      <div class="col-md-5">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+          <div class="card-body p-4">
+            <h6 class="text-muted fw-semibold small text-uppercase mb-3">Product Summary</h6>
+            <h5 class="fw-bold"><%= product.name %></h5>
+            <div class="bg-light rounded p-3 mt-3">
+              <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted small">List Price</span>
+                <span class="fw-bold text-success">$<%= parseFloat(product.price).toFixed(2) %></span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span class="text-muted small">Available Stock</span>
+                <span class="fw-bold"><%= product.stock %> units</span>
+              </div>
+            </div>
+            <div class="mt-4 p-3 border rounded small">
+              <h6 class="fw-semibold small mb-2">💡 Tips for a good RFQ</h6>
+              <ul class="text-muted mb-0 ps-3">
+                <li>Specify your exact quantity needs</li>
+                <li>Mention delivery timeline if urgent</li>
+                <li>Include any special requirements in the note</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+          <div class="card-body p-4">
+            <h4 class="fw-bold mb-1">Request for Quotation</h4>
+            <p class="text-muted small mb-4">Fill in the details below and the supplier will respond with a custom quote.</p>
+            <form action="/rfqs" method="POST">
+              <input type="hidden" name="product_id" value="<%= product.id %>">
+              <input type="hidden" name="supplier_id" value="<%= product.supplier_id %>">
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Quantity Needed</label>
+                <input type="number" name="quantity" class="form-control" min="1" max="100000" required>
+                <div class="form-text">Enter the number of units you need</div>
+              </div>
+              <div class="mb-4">
+                <label class="form-label fw-semibold small">Additional Notes <span class="text-muted">(optional)</span></label>
+                <textarea name="note" class="form-control" rows="4" maxlength="500"></textarea>
+                <div class="form-text">Special requirements, delivery preferences, etc.</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary px-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11Z"/></svg>
+                  Send RFQ
+                </button>
+                <a href="/products/<%= product.id %>" class="btn btn-outline-secondary px-4">Cancel</a>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
-    <form action="/rfqs" method="POST">
-      <input type="hidden" name="product_id" value="<%= product.id %>">
-      <input type="hidden" name="supplier_id" value="<%= product.supplier_id %>">
-      <div class="mb-3">
-        <label class="form-label">Quantity</label>
-        <input type="number" name="quantity" class="form-control" min="1" max="100000" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Note (optional)</label>
-        <textarea name="note" class="form-control" rows="3" maxlength="500"></textarea>
-      </div>
-      <button type="submit" class="btn btn-primary">Send RFQ</button>
-      <a href="/products/<%= product.id %>" class="btn btn-secondary ms-2">Cancel</a>
-    </form>
   </div>
+  <%- include('partials/footer') %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
