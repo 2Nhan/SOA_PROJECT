@@ -34,6 +34,7 @@ app.use(session({
 
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
+  res.locals.shopServiceUrl = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
   next();
 });
 
