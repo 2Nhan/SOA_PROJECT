@@ -153,7 +153,7 @@ Step 3: ACCEPT/REJECT QUOTE (Shop Service)
   v
 Step 4: CONFIRM CONTRACT (Supplier Service)
   |  Supplier confirms the contract
-  |  Contract status: pending --> confirmed
+  |  Contract status: draft --> confirmed
   |
   |  [Cancel] --> Contract status: cancelled
   v
@@ -357,7 +357,7 @@ rfqs           -- Request for Quotation from shops
   supplier_id  INT FOREIGN KEY -> users.id
   product_id   INT FOREIGN KEY -> products.id
   quantity     INT
-  message      TEXT
+  note         TEXT
   status       ENUM('pending', 'quoted', 'accepted', 'rejected', 'expired')
 
 quotes         -- Supplier responses to RFQs
@@ -380,7 +380,7 @@ contracts      -- Agreements formed from accepted quotes
   unit_price   DECIMAL(12,2)
   total_amount DECIMAL(12,2)
   delivery_days INT
-  status       ENUM('pending', 'confirmed', 'cancelled', 'completed')
+  status       ENUM('draft', 'confirmed', 'completed', 'cancelled')
 
 orders         -- Purchase orders (can be linked to contracts)
   id           INT PRIMARY KEY AUTO_INCREMENT

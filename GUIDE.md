@@ -1349,7 +1349,7 @@ If you stop an RDS instance, AWS will **automatically restart it after 7 days**.
 2. Click a product → Show detail page with "Send RFQ" button
 
 ### Step 4: RFQ → Quote → Contract Flow
-1. **Shop**: Send RFQ on a product → Fill quantity and message → Submit
+1. **Shop**: Send RFQ on a product → Fill quantity and note → Submit
 2. **Supplier**: Go to RFQs → Submit a quote (unit price, MOQ, delivery days)
 3. **Shop**: Go to My RFQs → Accept the quote → Contract auto-created
 4. **Supplier**: Go to Contracts → Confirm the contract
