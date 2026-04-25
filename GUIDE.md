@@ -268,9 +268,10 @@ docker run -d \
 sleep 15
 
 # Initialize the 3 separated databases with schema and seed data
-docker exec -i mysql-test mysql -uadmin -plab-password < deployment/auth_db_init.sql
-docker exec -i mysql-test mysql -uadmin -plab-password < deployment/supplier_db_init.sql
-docker exec -i mysql-test mysql -uadmin -plab-password < deployment/shop_db_init.sql
+# Use the root user to ensure you have permissions to CREATE DATABASE
+docker exec -i mysql-test mysql -uroot -prootpass < deployment/auth_db_init.sql
+docker exec -i mysql-test mysql -uroot -prootpass < deployment/supplier_db_init.sql
+docker exec -i mysql-test mysql -uroot -prootpass < deployment/shop_db_init.sql
 ```
 
 ### Task 4.3: Build and test the Shop microservice
