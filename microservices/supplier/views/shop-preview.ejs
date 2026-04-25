@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Preview - Customer Eyes Only</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .product-card {
+            border: none;
+            border-radius: 15px;
+            transition: transform 0.3s;
+            height: 100%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .product-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-img {
+            height: 200px;
+            object-fit: cover;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+            background-color: #ececec;
+        }
+
+        .btn-buy {
+            border-radius: 25px;
+            padding: 8px 25px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+        }
+
+        .badge-category {
+            background-color: #e9ecef;
+            color: #495057;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <%- include('partials/nav') %>
+
+        <div class="container py-5">
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <h2 class="fw-bold text-dark">Marketplace Preview</h2>
+                    <p class="text-muted">This is how your active products appear to potential buyers in the
+                        marketplace.</p>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <a href="/admin/products" class="btn btn-outline-secondary">Return to Management</a>
+                </div>
+            </div>
+
+            <% if (products && products.length> 0) { %>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+                    <% products.forEach(function(product) { %>
+                        <div class="col">
+                            <div class="card product-card">
+                                <% if (product.image_url) { %>
+                                    <img src="<%= product.image_url %>" class="card-img-top product-img"
+                                        alt="<%= product.name %>">
+                                    <% } else { %>
+                                        <div class="product-img d-flex align-items-center justify-content-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"
+                                                fill="#ced4da" class="bi bi-image" viewBox="0 0 16 16">
+                                                <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
+                                                <path
+                                                    d="M2.003 4.303a.5.5 0 0 1 .101-.306l.569-.76a.5.5 0 0 1 .799 0l1.1 1.468 1.954-2.171a.5.5 0 0 1 .712-.01l4.7 4.793a.5.5 0 0 1 .08.533A2 2 0 0 1 12 11h-4.004l-.001-.001a1.5 1.5 0 1 1 2.458-1.457 1.5 1.5 0 0 1-2.457 1.457L7.994 11H4a2 2 0 0 1-1.997-1.697z" />
+                                            </svg>
+                                        </div>
+                                        <% } %>
+                                            <div class="card-body p-4">
+                                                <div class="mb-2">
+                                                    <span class="badge badge-category">
+                                                        <%= product.category || 'General' %>
+                                                    </span>
+                                                </div>
+                                                <h5 class="card-title fw-bold text-dark mb-1">
+                                                    <%= product.name %>
+                                                </h5>
+                                                <p class="card-text text-muted small mb-3">
+                                                    <%= product.description ? product.description.substring(0, 80)
+                                                        + '...' : 'No description available' %>
+                                                </p>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="fs-4 fw-bold text-success">$<%=
+                                                            parseFloat(product.price).toFixed(2) %></span>
+                                                    <button class="btn btn-primary btn-buy" disabled>Send RFQ</button>
+                                                </div>
+                                            </div>
+                            </div>
+                        </div>
+                        <% }); %>
+                </div>
+                <% } else { %>
+                    <div class="text-center py-5">
+                        <img src="https://cdn-icons-png.flaticon.com/512/3251/3251347.png" width="120"
+                            class="mb-3 opacity-50">
+                        <h3>No Active Products to Preview</h3>
+                        <p class="text-muted">Once you add and approve products, they will appear here as they would in
+                            the shop.</p>
+                        <a href="/admin/products/add" class="btn btn-success mt-3">Add Product Now</a>
+                    </div>
+                    <% } %>
+        </div>
+
+        <%- include('partials/footer') %>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

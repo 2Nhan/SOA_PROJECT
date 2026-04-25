@@ -25,6 +25,19 @@ exports.findAll = async (req, res) => {
   }
 };
 
+exports.shopPreview = async (req, res) => {
+  try {
+    const products = await new Promise((resolve, reject) => {
+      Product.getAll((err, data) => err ? reject(err) : resolve(data));
+    });
+    // For preview, we show all active products as a customer would see
+    const enriched = products.filter(p => p.status === 'active');
+    res.render("shop-preview", { products: enriched });
+  } catch (err) {
+    res.status(500).render("error", { message: "Error loading shop preview" });
+  }
+};
+
 exports.createForm = (req, res) => {
   res.render("product-add");
 };

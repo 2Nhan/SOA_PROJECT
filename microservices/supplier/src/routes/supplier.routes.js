@@ -56,6 +56,7 @@ router.get("/admin/", requireAuth, (req, res) => res.render("dashboard"));
 
 // Supplier - Products CRUD
 router.get("/admin/products", requireAuth, productController.findAll);
+router.get("/admin/shop-preview", requireAuth, productController.shopPreview);
 router.get("/admin/products/add", requireAuth, productController.createForm);
 router.post("/admin/products", requireAuth, productController.create);
 router.get("/admin/products/edit/:id", requireAuth, productController.editForm);
