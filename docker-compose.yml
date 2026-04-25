@@ -5,49 +5,88 @@ services:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: lab-password
-      MYSQL_DATABASE: b2bmarket
-      MYSQL_USER: admin
-      MYSQL_PASSWORD: lab-password
     ports:
       - "3306:3306"
     volumes:
-      - ./deployment/db-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./deployment/auth_db_init.sql:/docker-entrypoint-initdb.d/01-auth.sql
+      - ./deployment/supplier_db_init.sql:/docker-entrypoint-initdb.d/02-supplier.sql
+      - ./deployment/shop_db_init.sql:/docker-entrypoint-initdb.d/03-shop.sql
       - db-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --init-connect="
+        CREATE USER IF NOT EXISTS 'admin'@'%' IDENTIFIED BY 'lab-password';
+        GRANT ALL PRIVILEGES ON auth_db.* TO 'admin'@'%';
+        GRANT ALL PRIVILEGES ON shop_db.* TO 'admin'@'%';
+        GRANT ALL PRIVILEGES ON supplier_db.* TO 'admin'@'%';
+        FLUSH PRIVILEGES;
+      "
+
+  auth:
+    build: 
+      context: .
+      dockerfile: ./microservices/auth/docker/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      APP_DB_HOST: db
+      APP_DB_USER: root
+      APP_DB_PASSWORD: lab-password
+      APP_DB_NAME: auth_db
+      APP_DB_PORT: 3306
+      PORT: 8082
+      SHOP_SERVICE_URL: http://shop:8080
+      SUPPLIER_SERVICE_URL: http://supplier:8080
+    depends_on:
+      db:
+        condition: service_healthy
 
   shop:
-    build: ./microservices/shop
+    build: 
+      context: .
+      dockerfile: ./microservices/shop/docker/Dockerfile
     ports:
       - "8080:8080"
     environment:
       APP_DB_HOST: db
-      APP_DB_USER: admin
+      APP_DB_USER: root
       APP_DB_PASSWORD: lab-password
-      APP_DB_NAME: b2bmarket
+      APP_DB_NAME: shop_db
       APP_DB_PORT: 3306
       PORT: 8080
+      AUTH_SERVICE_URL: http://auth:8082
+      SUPPLIER_SERVICE_URL: http://supplier:8080
     depends_on:
       db:
         condition: service_healthy
+      auth:
+        condition: service_started
 
   supplier:
-    build: ./microservices/supplier
+    build: 
+      context: .
+      dockerfile: ./microservices/supplier/docker/Dockerfile
     ports:
       - "8081:8080"
     environment:
       APP_DB_HOST: db
-      APP_DB_USER: admin
+      APP_DB_USER: root
       APP_DB_PASSWORD: lab-password
-      APP_DB_NAME: b2bmarket
+      APP_DB_NAME: supplier_db
       APP_DB_PORT: 3306
       PORT: 8080
+      AUTH_SERVICE_URL: http://auth:8082
+      SHOP_SERVICE_URL: http://shop:8080
     depends_on:
       db:
         condition: service_healthy
+      auth:
+        condition: service_started
 
 volumes:
   db-data:

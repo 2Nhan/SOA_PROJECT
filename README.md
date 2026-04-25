@@ -29,7 +29,12 @@ The system models a B2B marketplace with **three roles**:
 - **Supplier** (seller) — manage inventory, upload product images, respond to RFQs with quotes, confirm contracts/orders, process payments
 - **Admin** (system controller) — approve/reject new users and products, monitor all RFQs, contracts, and system activity
 
-The full B2B procurement flow is: **RFQ → Quote → Contract → Order → Payment**, following real-world B2B purchasing processes. The application is split into two independently deployable microservices, each running in its own Docker container on AWS ECS Fargate. The Admin role is hosted within the Supplier Service under a dedicated route prefix (`/admin/manage/*`) — a deliberate design choice to optimize costs while maintaining clean code separation (own controller, model, and views) that allows extraction into a 3rd service when scaling demands it.
+The full B2B procurement flow is: **RFQ → Quote → Contract → Order → Payment**, following real-world B2B purchasing processes. The application is built using a **Database-per-Service** architecture, split into three independently deployable microservices:
+- **Auth Service** (Centralized identity and session management)
+- **Shop Service** (Buyer operations)
+- **Supplier Service** (Seller and admin operations)
+
+Each runs in its own Docker container and connects to its own dedicated database schema. Inter-service communication is handled via internal REST APIs using the API Composition pattern.
 
 Key design decisions:
 - Three-role system (Shop, Supplier, Admin) with approval workflows
@@ -57,21 +62,23 @@ Key design decisions:
                         |        |
               Path: /*  |        | Path: /admin/*
                         |        |
-               +--------v--+  +--v-----------+
-               | ECS Task   |  | ECS Task      |
-               | Shop       |  | Supplier      |
-               | Service    |  | Service       |
-               | (Fargate)  |  | (Fargate)     |
-               | Port 8080  |  | Port 8080     |
-               +--------+--+  +--+-----------+
-                        |        |       |
-                    +---v--------v--+    |
-                    | Amazon RDS    |    |
-                    | MySQL 8.0     |    v
-                    | (db.c6gd.med) |  +-------------+
-                    +---------------+  | Amazon S3   |
-                                       | (Images)    |
-                                       +-------------+
+               +--------v--+  +--v-----------+  +--v-----------+
+               | ECS Task   |  | ECS Task      |  | ECS Task      |
+               | Shop       |  | Supplier      |  | Auth          |
+               | Service    |  | Service       |  | Service       |
+               | Port 8080  |  | Port 8080     |  | Port 8082     |
+               +--------+--+  +--+-----------+  +--+-----------+
+                        |        |                 |
+                    +---v--------v-----------------v--+
+                    | Amazon RDS                      |
+                    | MySQL 8.0 (Database-per-service)|
+                    | (auth_db, shop_db, supplier_db) |
+                    +---------------+-----------------+
+                                    |
+                             +-------------+
+                             | Amazon S3   |
+                             | (Images)    |
+                             +-------------+
 
     +--------------------------------------------------+
     | CI/CD (No CodeBuild/CodePipeline - Learner Lab)   |
@@ -93,22 +100,31 @@ Traffic routing is handled by a single Application Load Balancer with path-based
 
 ## Microservices
 
-### Shop Service (Buyer)
+### Auth Service (Identity Layer)
 
-Handles the buyer-facing experience. Shops browse products, send RFQs to suppliers, review quotes, accept/reject quotes to form contracts, and create orders from contracts.
+Handles all user management, authentication, and session handling. Provides a centralized UI for login/registration and exposes internal REST APIs for other services to resolve user data.
 
 | Responsibility | Description |
 |---|---|
-| Product browsing | View all approved products with images, search and filtering |
-| RFQ management | Send Request for Quotation to suppliers for specific products |
-| Quote review | Review supplier quotes, accept or reject them |
+| Registration & Login | Unified UI for users to sign up and authenticate |
+| Profile Management | Update name, email, change password |
+| Inter-service API | Provides batch lookup (`/api/users?ids=X,Y`) for API composition |
+| Session Management | Centralized cookie-based session tracking |
+
+### Shop Service (Buyer)
+
+Handles the buyer-facing experience. Shops browse products, send RFQs to suppliers, review quotes, and create orders. It queries `shop_db` and aggregates data from Auth and Supplier via HTTP APIs.
+
+| Responsibility | Description |
+|---|---|
+| Product browsing | View approved products (data via Supplier API) |
+| RFQ management | Send Requests for Quotation and review quotes |
 | Contract management | View contracts formed from accepted quotes |
-| Order placement | Create orders from contracts with stock validation |
-| Order tracking | View order history and current status |
+| Order placement | Create orders with distributed stock validation (Saga pattern) |
 
 ### Supplier Service (Seller + Admin)
 
-Handles seller operations and system administration. Suppliers manage inventory, respond to RFQs with quotes, confirm contracts and orders, and process payments. The Admin role (integrated here) approves users/products and monitors system activity. The Supplier Service has its own independent authentication flow (`/admin/login`, `/admin/register`, `/admin/logout`) with its own login and registration views — it does not redirect to the Shop Service for authentication.
+Handles seller operations and system administration. Suppliers manage inventory, respond to RFQs, and process payments. Maintains `supplier_db`.
 
 | Responsibility | Description |
 |---|---|
@@ -329,8 +345,11 @@ The application implements multiple layers of security:
 
 ---
 
-## Database Schema
+## Database Schema (Database-per-Service)
 
+The application uses three isolated databases:
+
+**1. `auth_db` (Identity Service)**
 ```sql
 users          -- Registered accounts
   id           INT PRIMARY KEY AUTO_INCREMENT
@@ -339,7 +358,10 @@ users          -- Registered accounts
   full_name    VARCHAR(255)
   role         ENUM('shop', 'supplier', 'admin')
   status       ENUM('pending', 'approved', 'rejected') DEFAULT 'pending'
+```
 
+**2. `supplier_db` (Catalog & Financial Service)**
+```sql
 products       -- Product catalog (requires admin approval)
   id           INT PRIMARY KEY AUTO_INCREMENT
   supplier_id  INT FOREIGN KEY -> users.id
@@ -350,7 +372,10 @@ products       -- Product catalog (requires admin approval)
   status       ENUM('active', 'inactive', 'pending') DEFAULT 'pending'
   image_url    VARCHAR(500)
   category     VARCHAR(100)
+```
 
+**3. `shop_db` (Procurement Service)**
+```sql
 rfqs           -- Request for Quotation from shops
   id           INT PRIMARY KEY AUTO_INCREMENT
   shop_id      INT FOREIGN KEY -> users.id
@@ -369,7 +394,10 @@ quotes         -- Supplier responses to RFQs
   delivery_days INT
   note         TEXT
   status       ENUM('pending', 'accepted', 'rejected')
+```
 
+**Back inside `supplier_db`**:
+```sql
 contracts      -- Agreements formed from accepted quotes
   id           INT PRIMARY KEY AUTO_INCREMENT
   quote_id     INT FOREIGN KEY -> quotes.id
@@ -382,7 +410,11 @@ contracts      -- Agreements formed from accepted quotes
   delivery_days INT
   status       ENUM('draft', 'confirmed', 'completed', 'cancelled')
 
-orders         -- Purchase orders (can be linked to contracts)
+```
+
+**Back inside `shop_db`**:
+```sql
+orders         -- Purchase orders (linked to contracts)
   id           INT PRIMARY KEY AUTO_INCREMENT
   shop_id      INT FOREIGN KEY -> users.id
   product_id   INT FOREIGN KEY -> products.id
@@ -392,6 +424,10 @@ orders         -- Purchase orders (can be linked to contracts)
   status       ENUM('pending', 'confirmed', 'paid', 'cancelled', 'delivering', 'delivered')
   note         TEXT
 
+```
+
+**Back inside `supplier_db`**:
+```sql
 payments       -- Payment records for confirmed orders
   id           INT PRIMARY KEY AUTO_INCREMENT
   order_id     INT FOREIGN KEY -> orders.id
@@ -498,7 +534,7 @@ docker-compose up --build
 # Supplier panel:  http://localhost:8081/admin/
 ```
 
-The database is automatically initialized with schema and seed data from `deployment/db-init.sql`, including placeholder product images from Unsplash.
+The databases are automatically initialized with schema and seed data from `deployment/auth_db_init.sql`, `deployment/supplier_db_init.sql`, and `deployment/shop_db_init.sql`.
 
 ### Demo Credentials
 
@@ -524,66 +560,60 @@ docker-compose down -v       # Stop services, delete database volume
 ├── GUIDE.md                              # Deployment guide and budget management
 ├── README.md                             # This file
 ├── docker-compose.yml                    # Local development environment
+├── CONTRIBUTING.md                       # Developer guidelines & conventions
 ├── docs/
-│   └── architecture-diagram.html         # Visual architecture diagram
+│   └── api-specs/
+│       └── b2b-marketplace-api.yaml      # OpenAPI documentation for REST APIs
 ├── deployment/
-│   ├── db-init.sql                       # Database schema and seed data
-│   ├── appspec-shop.yaml                 # CodeDeploy spec for Shop
-│   ├── appspec-supplier.yaml             # CodeDeploy spec for Supplier
-│   ├── taskdef-shop.json                 # ECS task definition for Shop
-│   ├── taskdef-supplier.json             # ECS task definition for Supplier
-│   ├── create-shop-microservice-tg-two.json
-│   └── create-supplier-microservice-tg-two.json
+│   ├── auth_db_init.sql                  # Auth database schema + seed
+│   ├── supplier_db_init.sql              # Supplier database schema + seed
+│   ├── shop_db_init.sql                  # Shop database schema + seed
+│   ├── appspec-shop.yaml                 # CodeDeploy spec
+│   ├── appspec-supplier.yaml             
+│   ├── appspec-auth.yaml             
+│   ├── taskdef-shop.json                 
+│   ├── taskdef-supplier.json             
+│   ├── taskdef-auth.json             
+│   └── ...
+├── shared/                               # DRY package: Reused code across all services
+│   ├── clients/                          # HTTP integrations (e.g., auth.client.js)
+│   ├── config/                           # Standard DB pool setup
+│   └── middlewares/                      # Auth guards, JSON-aware error handling
 └── microservices/
-    ├── shop/                             # Shop (Buyer) Microservice
-    │   ├── Dockerfile
-    │   ├── buildspec.yml
+    ├── auth/                             # Auth Identity Microservice
     │   ├── package.json
-    │   ├── index.js                      # Express server + routes
-    │   ├── app/
+    │   ├── index.js                      # Lightweight Express Bootstrapper
+    │   ├── docker/                       # Dockerfile for build context
+    │   ├── src/                          # Auth Domain Logic
+    │   │   ├── config/                   # Local db configuration overrides
+    │   │   ├── api/                      # REST API (JSON) serving Machine-to-Machine
+    │   │   ├── controllers/              # Web UI serving EJS templates
+    │   │   └── routes/                   # auth.routes.js mapping logic
+    │   └── views/
+    ├── shop/                             # Shop (Buyer) Microservice
+    │   ├── package.json
+    │   ├── index.js                      # Lightweight Express Bootstrapper
+    │   ├── docker/
+    │   ├── src/
     │   │   ├── config/
-    │   │   │   ├── config.js
-    │   │   │   └── db.js
-    │   │   ├── controller/
-    │   │   │   ├── auth.controller.js    # Login, register, profile, password
-    │   │   │   ├── product.controller.js
-    │   │   │   ├── order.controller.js
-    │   │   │   ├── rfq.controller.js     # RFQ creation, quote accept/reject
-    │   │   │   └── contract.controller.js # Contract view, order from contract
-    │   │   └── models/
-    │   │       ├── auth.model.js         # Register, login, profile, password
-    │   │       ├── product.model.js
-    │   │       ├── order.model.js
-    │   │       ├── rfq.model.js          # RFQ CRUD, quote accept/reject logic
-    │   │       └── contract.model.js     # Contract queries, order creation
-    │   └── views/                        # EJS templates (Bootstrap 5)
+    │   │   ├── api/                      # JSON APIs logic (Order states, RFQs)
+    │   │   ├── clients/                  # HTTP calls to Supplier & Auth
+    │   │   ├── controllers/              # Web UI Controllers
+    │   │   ├── models/                   # Local database abstractions
+    │   │   └── routes/
+    │   └── views/
     └── supplier/                         # Supplier + Admin Microservice
-        ├── Dockerfile
-        ├── buildspec.yml
         ├── package.json
-        ├── index.js                      # Express server + routes
-        ├── app/
-        │   ├── config/
-        │   │   ├── config.js
-        │   │   ├── db.js
-        │   │   └── s3.js                 # S3 client + multer
-        │   ├── controller/
-        │   │   ├── auth.controller.js    # Login, register, profile, password
-        │   │   ├── product.controller.js
-        │   │   ├── order.controller.js
-        │   │   ├── payment.controller.js
-        │   │   ├── rfq.controller.js     # View RFQs, submit quotes
-        │   │   ├── contract.controller.js # Confirm/cancel contracts
-        │   │   └── admin.controller.js   # User/product approval, dashboard
-        │   └── models/
-        │       ├── auth.model.js         # Register, login, profile, password
-        │       ├── product.model.js
-        │       ├── order.model.js
-        │       ├── payment.model.js
-        │       ├── rfq.model.js          # RFQ queries, quote submission
-        │       ├── contract.model.js     # Contract CRUD
-        │       └── admin.model.js        # User/product approval, stats
-        └── views/                        # EJS templates (Bootstrap 5)
+        ├── index.js                      # Lightweight Express Bootstrapper
+        ├── docker/
+        ├── src/
+        │   ├── config/                   # S3 Config, Local DB config
+        │   ├── api/                      # JSON APIs Logic (Product fetches, Quotes)
+        │   ├── clients/                  # HTTP calls to Shop & Auth
+        │   ├── controllers/              # Web views for Dashboard, Admin users
+        │   ├── models/                   # Local database abstractions
+        │   └── routes/
+        └── views/
 ```
 
 ---

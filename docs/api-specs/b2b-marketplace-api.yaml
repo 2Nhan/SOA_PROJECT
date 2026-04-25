@@ -1,0 +1,44 @@
+openapi: 3.0.0
+info:
+  title: B2B Marketplace API
+  description: Internal and public REST APIs for the Auth, Shop, and Supplier microservices.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Shop / Supplier Gateway
+  - url: http://localhost:8082
+    description: Auth Service
+paths:
+  /api/users:
+    get:
+      summary: Fetch users by IDs (Batch)
+      description: Used by Auth Service to resolve user references without N+1 queries.
+      parameters:
+        - in: query
+          name: ids
+          required: true
+          schema:
+            type: string
+          example: "1,2,3"
+      responses:
+        '200':
+          description: A JSON array of users
+  /api/products:
+    get:
+      summary: Fetch products from Supplier Service
+      responses:
+        '200':
+          description: Successful
+  /api/rfqs:
+    get:
+      summary: Fetch RFQs from Shop Service
+      responses:
+        '200':
+          description: Successful
+  /api/orders:
+    post:
+      summary: Create an order (Saga transaction)
+      description: Initiates an order and reduces stock on Supplier service.
+      responses:
+        '201':
+          description: Created

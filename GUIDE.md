@@ -25,7 +25,7 @@
 
 ### Task 1.1: Review the Architecture Diagram
 
-Open `docs/architecture-diagram.html` in a browser to view the system architecture. The diagram illustrates:
+Open `README.md` to view the System Architecture section. The architecture illustrates:
 
 - **Networking (VPC)**: VPC with 2 public subnets (use LabVPC if available, otherwise default VPC)
 - **Database (Amazon RDS)**: MySQL 8.0 instance (`db.c6gd.medium`) within the VPC
@@ -232,8 +232,10 @@ docker run -d \
 # Wait for MySQL to be ready (~15 seconds)
 sleep 15
 
-# Initialize the database with schema and seed data
-docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/db-init.sql
+# Initialize the databases with schema and seed data
+docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/auth_db_init.sql
+docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/supplier_db_init.sql
+docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/shop_db_init.sql
 ```
 
 ### Task 4.3: Build and test the Shop microservice
@@ -315,9 +317,10 @@ git push codecommit main
 # Navigate to project directory
 cd ~/environment/AWS_LAB
 
-# Build Docker images first (services are inside microservices/)
-docker build -t shop ./microservices/shop
-docker build -t supplier ./microservices/supplier
+# Build Docker images first (Run this from the project root . to include 'shared/' package)
+docker build -t auth -f ./microservices/auth/docker/Dockerfile .
+docker build -t shop -f ./microservices/shop/docker/Dockerfile .
+docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
 
 # Get the Account ID
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
@@ -327,7 +330,8 @@ echo "Account ID: $account_id"
 aws ecr get-login-password --region us-east-1 | docker login --username AWS \
   --password-stdin $account_id.dkr.ecr.us-east-1.amazonaws.com
 
-# Create 2 Private ECR repositories
+# Create 3 Private ECR repositories
+aws ecr create-repository --repository-name auth
 aws ecr create-repository --repository-name shop
 aws ecr create-repository --repository-name supplier
 ```
@@ -487,9 +491,11 @@ USE b2bmarket;
 exit
 ```
 
-Load the schema and seed data:
+Load the schema and seed data for the 3 databases:
 ```bash
-mysql -h <RDS-ENDPOINT> -u admin -plab-password b2bmarket < ~/environment/AWS_LAB/deployment/db-init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/auth_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/supplier_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/shop_db_init.sql
 ```
 
 Verify (note: you must include `-u admin -plab-password` and the database name):

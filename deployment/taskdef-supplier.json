@@ -27,11 +27,19 @@
         },
         {
           "name": "APP_DB_NAME",
-          "value": "b2bmarket"
+          "value": "supplier_db"
         },
         {
           "name": "APP_DB_PORT",
           "value": "3306"
+        },
+        {
+          "name": "AUTH_SERVICE_URL",
+          "value": "http://<ALB-DNS-NAME>"
+        },
+        {
+          "name": "SHOP_SERVICE_URL",
+          "value": "http://<ALB-DNS-NAME>"
         }
       ],
       "essential": true,
@@ -45,7 +53,9 @@
       }
     }
   ],
-  "requiresCompatibilities": ["FARGATE"],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
   "cpu": "256",
   "memory": "512",
   "executionRoleArn": "arn:aws:iam::<ACCOUNT-ID>:role/LabRole",
