@@ -1,18 +1,12 @@
 FROM node:18-alpine
 WORKDIR /usr/src/app
 
-# Copy auth package files
-COPY microservices/auth/package*.json ./microservices/auth/
-WORKDIR /usr/src/app/microservices/auth
+# Copy auth package files to root for shared module access
+COPY microservices/auth/package*.json ./
 RUN npm install --production
 
-# Go back to root app dir
-WORKDIR /usr/src/app
-
-# Copy shared logic
+# Copy shared logic and auth microservice code
 COPY shared ./shared
-
-# Copy auth microservice code
 COPY microservices/auth ./microservices/auth
 
 WORKDIR /usr/src/app/microservices/auth
