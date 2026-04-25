@@ -1,6 +1,6 @@
 /**
- * Shop Service Client — HTTP client for Supplier to call Shop service
- * Used to fetch RFQ and Order data
+ * Shop Service Client — HTTP client for inter-service communication
+ * Used by Supplier service to fetch RFQ and Order data
  */
 const http = require("http");
 
@@ -87,7 +87,7 @@ function httpPost(url, body, timeoutMs) {
  * Get RFQs by supplier ID
  */
 async function getRfqsBySupplierId(supplierId) {
-    return await httpGet(`${SHOP_SERVICE_URL}/api/rfqs?supplier_id=${supplierId}`, TIMEOUT_MS);
+    return await httpGet(`${SHOP_SERVICE_URL}/api/shop/rfqs?supplier_id=${supplierId}`, TIMEOUT_MS);
 }
 
 /**
@@ -95,7 +95,7 @@ async function getRfqsBySupplierId(supplierId) {
  */
 async function getRfqById(id) {
     try {
-        return await httpGet(`${SHOP_SERVICE_URL}/api/rfqs/${id}`, TIMEOUT_MS);
+        return await httpGet(`${SHOP_SERVICE_URL}/api/shop/rfqs/${id}`, TIMEOUT_MS);
     } catch (err) {
         console.warn(`[ShopService] getRfqById(${id}) failed: ${err.message}`);
         return null;
@@ -106,14 +106,14 @@ async function getRfqById(id) {
  * Update RFQ status
  */
 async function updateRfqStatus(rfqId, status) {
-    return await httpPost(`${SHOP_SERVICE_URL}/api/rfqs/${rfqId}/status`, { status }, TIMEOUT_MS);
+    return await httpPost(`${SHOP_SERVICE_URL}/api/shop/rfqs/${rfqId}/status`, { status }, TIMEOUT_MS);
 }
 
 /**
  * Get orders (all or by product IDs for supplier viewing)
  */
 async function getAllOrders() {
-    return await httpGet(`${SHOP_SERVICE_URL}/api/orders/all`, TIMEOUT_MS);
+    return await httpGet(`${SHOP_SERVICE_URL}/api/shop/orders/all`, TIMEOUT_MS);
 }
 
 /**
@@ -121,7 +121,7 @@ async function getAllOrders() {
  */
 async function getOrderById(id) {
     try {
-        return await httpGet(`${SHOP_SERVICE_URL}/api/orders/${id}`, TIMEOUT_MS);
+        return await httpGet(`${SHOP_SERVICE_URL}/api/shop/orders/${id}`, TIMEOUT_MS);
     } catch (err) {
         console.warn(`[ShopService] getOrderById(${id}) failed: ${err.message}`);
         return null;
@@ -132,7 +132,7 @@ async function getOrderById(id) {
  * Update order status
  */
 async function updateOrderStatus(orderId, status) {
-    return await httpPost(`${SHOP_SERVICE_URL}/api/orders/${orderId}/status`, { status }, TIMEOUT_MS);
+    return await httpPost(`${SHOP_SERVICE_URL}/api/shop/orders/${orderId}/status`, { status }, TIMEOUT_MS);
 }
 
 /**
@@ -140,7 +140,7 @@ async function updateOrderStatus(orderId, status) {
  */
 async function getShopStats() {
     try {
-        return await httpGet(`${SHOP_SERVICE_URL}/api/stats`, TIMEOUT_MS);
+        return await httpGet(`${SHOP_SERVICE_URL}/api/shop/stats`, TIMEOUT_MS);
     } catch (err) {
         console.warn(`[ShopService] getShopStats failed: ${err.message}`);
         return { totalOrders: 0, totalRFQs: 0 };
@@ -151,7 +151,7 @@ async function getShopStats() {
  * Get all RFQs (for admin overview)
  */
 async function getAllRfqs() {
-    return await httpGet(`${SHOP_SERVICE_URL}/api/rfqs/all`, TIMEOUT_MS);
+    return await httpGet(`${SHOP_SERVICE_URL}/api/shop/rfqs/all`, TIMEOUT_MS);
 }
 
 module.exports = {

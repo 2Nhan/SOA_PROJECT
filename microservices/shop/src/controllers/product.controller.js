@@ -1,5 +1,5 @@
-const supplierService = require("../clients/supplier.client");
-const authService = require("../../../shared/clients/auth.client");
+const supplierService = require("../../../../shared/clients/supplier.client");
+const authService = require("../../../../shared/clients/auth.client");
 
 exports.findAll = async (req, res) => {
   try {

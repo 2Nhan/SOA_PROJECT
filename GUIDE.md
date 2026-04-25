@@ -150,29 +150,38 @@ ls -la
 ```
 
 You should see:
-```
 ├── GUIDE.md
 ├── README.md
+├── deploy.sh
 ├── docker-compose.yml
+├── shared/
+│   ├── clients/
+│   │   ├── auth.client.js
+│   │   ├── shop.client.js
+│   │   └── supplier.client.js
+│   ├── config/
+│   │   └── db.config.js
+│   └── middlewares/
+│       ├── auth.middleware.js
+│       ├── error.middleware.js
+│       └── standard.middleware.js
 ├── deployment/
-│   ├── db-init.sql
+│   ├── auth_db_init.sql
+│   ├── shop_db_init.sql
+│   ├── supplier_db_init.sql
+│   ├── appspec-auth.yaml
 │   ├── appspec-shop.yaml
 │   ├── appspec-supplier.yaml
+│   ├── taskdef-auth.json
 │   ├── taskdef-shop.json
 │   ├── taskdef-supplier.json
+│   ├── create-auth-microservice-tg-two.json
 │   ├── create-shop-microservice-tg-two.json
 │   └── create-supplier-microservice-tg-two.json
 └── microservices/
+    ├── auth/
     ├── shop/
-    │   ├── Dockerfile
-    │   ├── index.js
-    │   ├── package.json
-    │   └── app/
     └── supplier/
-        ├── Dockerfile
-        ├── index.js
-        ├── package.json
-        └── app/
 ```
 
 ### Task 3.4: Push the code to CodeCommit
@@ -203,15 +212,42 @@ git config --global user.email "<your-email@example.com>"
 
 ---
 
+## Phase 3.5: Creating an Amazon S3 Bucket
+
+Both the Supplier microservice (for product images) and the CodeDeploy deployment process (for AppSpec files) require an Amazon S3 bucket.
+
+### Task 3.6: Create the S3 bucket
+
+1. Open the **Amazon S3** console
+2. Select **Create bucket**
+3. **Bucket name**: `b2b-marketplace-images` (Note: This must be globally unique. If taken, use `b2b-marketplace-images-<your-name>`)
+4. **AWS Region**: Select **US East (N. Virginia) (us-east-1)**
+5. **Object Ownership**: ACLs enabled, and Bucket owner preferred (this ensures uploaded images are accessible)
+6. **Block Public Access settings for this bucket**: **Uncheck** "Block all public access" (images need to be publicly visible in the shop)
+7. Check the box "I acknowledge that the current settings might result in this bucket and the objects within it becoming public"
+8. Select **Create bucket**
+
+### Task 3.7: Create a directory for CodeDeploy
+
+1. Open your newly created bucket
+2. Select **Create folder**
+3. **Folder name**: `deploy`
+4. Select **Create folder**
+
+> **Note**: If you chose a different bucket name, update the `S3_BUCKET` variable in `deployment/taskdef-supplier.json` and the S3 bucket name in `deploy.sh`!
+
+---
+
 ## Phase 4: Building and Testing Microservices in Docker
 
 ### Task 4.1: Adjust the Cloud9 instance security group
 
 1. In the **Amazon EC2** console, find the Security Group attached to the Cloud9 instance
 2. Select the Security Group → **Edit Inbound Rules**
-3. Add two rules:
+3. Add three rules:
    - Type: **Custom TCP**, Port Range: **8080**, Source: **Anywhere (0.0.0.0/0)**
    - Type: **Custom TCP**, Port Range: **8081**, Source: **Anywhere (0.0.0.0/0)**
+   - Type: **Custom TCP**, Port Range: **8082**, Source: **Anywhere (0.0.0.0/0)**
 4. Select **Save rules**
 
 ### Task 4.2: Start a local MySQL database for testing
@@ -223,7 +259,6 @@ cd ~/environment/AWS_LAB
 docker run -d \
   --name mysql-test \
   -e MYSQL_ROOT_PASSWORD=rootpass \
-  -e MYSQL_DATABASE=b2bmarket \
   -e MYSQL_USER=admin \
   -e MYSQL_PASSWORD=lab-password \
   -p 3306:3306 \
@@ -232,19 +267,19 @@ docker run -d \
 # Wait for MySQL to be ready (~15 seconds)
 sleep 15
 
-# Initialize the databases with schema and seed data
-docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/auth_db_init.sql
-docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/supplier_db_init.sql
-docker exec -i mysql-test mysql -uadmin -plab-password b2bmarket < deployment/shop_db_init.sql
+# Initialize the 3 separated databases with schema and seed data
+docker exec -i mysql-test mysql -uadmin -plab-password < deployment/auth_db_init.sql
+docker exec -i mysql-test mysql -uadmin -plab-password < deployment/supplier_db_init.sql
+docker exec -i mysql-test mysql -uadmin -plab-password < deployment/shop_db_init.sql
 ```
 
 ### Task 4.3: Build and test the Shop microservice
 
 ```bash
-cd ~/environment/AWS_LAB/microservices/shop
+cd ~/environment/AWS_LAB
 
-# Build the Docker image
-docker build --tag shop .
+# Build the Docker image from the root context (so it can access shared code)
+docker build -t shop -f ./microservices/shop/docker/Dockerfile .
 
 # View built images
 docker images
@@ -254,7 +289,7 @@ docker run -d --name shop_1 -p 8080:8080 \
   -e APP_DB_HOST="host.docker.internal" \
   -e APP_DB_USER="admin" \
   -e APP_DB_PASSWORD="lab-password" \
-  -e APP_DB_NAME="b2bmarket" \
+  -e APP_DB_NAME="shop_db" \
   -e APP_DB_PORT="3306" \
   shop
 
@@ -263,7 +298,7 @@ docker run -d --name shop_1 -p 8080:8080 \
 ```
 
 Test: Use **Cloud9 Preview** (Tools → Preview → Preview Running Application) or access `http://<Cloud9-Public-IP>:8080` in a browser. Confirm:
-- Login page loads at `/login`
+- Login page loads at `/`
 - Health check works at `/health`
 
 > **⚠️ Learner Lab Note**: Direct access via public IP may be blocked by security groups. Use **Cloud9 Preview** instead: click **Preview** → **Preview Running Application** in the Cloud9 menu bar. Append the port path if needed (e.g., `/health`).
@@ -271,17 +306,17 @@ Test: Use **Cloud9 Preview** (Tools → Preview → Preview Running Application)
 ### Task 4.4: Build and test the Supplier microservice
 
 ```bash
-cd ~/environment/AWS_LAB/microservices/supplier
+cd ~/environment/AWS_LAB
 
 # Build the Docker image
-docker build --tag supplier .
+docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
 
 # Run the Supplier container
 docker run -d --name supplier_1 -p 8081:8080 \
   -e APP_DB_HOST="host.docker.internal" \
   -e APP_DB_USER="admin" \
   -e APP_DB_PASSWORD="lab-password" \
-  -e APP_DB_NAME="b2bmarket" \
+  -e APP_DB_NAME="supplier_db" \
   -e APP_DB_PORT="3306" \
   supplier
 ```
@@ -292,10 +327,30 @@ Test: Use **Cloud9 Preview** or access `http://<Cloud9-Public-IP>:8081/admin/log
 
 > **Tip**: For Cloud9 Preview on port 8081, change the preview URL port from 8080 to 8081.
 
+### Task 4.4b: Build and test the Auth microservice
+
+```bash
+cd ~/environment/AWS_LAB
+
+# Build the Docker image
+docker build -t auth -f ./microservices/auth/docker/Dockerfile .
+
+# Run the Auth container
+docker run -d --name auth_1 -p 8082:8082 \
+  -e APP_DB_HOST="host.docker.internal" \
+  -e APP_DB_USER="admin" \
+  -e APP_DB_PASSWORD="lab-password" \
+  -e APP_DB_NAME="auth_db" \
+  -e APP_DB_PORT="3306" \
+  auth
+```
+
+Test: Access `http://<Cloud9-Public-IP>:8082/health` in a browser. Confirm it returns `{"status":"ok"}`.
+
 ### Task 4.5: Clean up test containers
 
 ```bash
-docker rm -f shop_1 supplier_1 mysql-test
+docker rm -f shop_1 supplier_1 auth_1 mysql-test
 ```
 
 ### Task 4.6: Commit and push code to CodeCommit
@@ -303,7 +358,7 @@ docker rm -f shop_1 supplier_1 mysql-test
 ```bash
 cd ~/environment/AWS_LAB
 git add .
-git commit -m "Verified: both microservices build and run correctly in Docker"
+git commit -m "Verified: all three microservices build and run correctly in Docker"
 git push codecommit main
 ```
 
@@ -336,10 +391,11 @@ aws ecr create-repository --repository-name shop
 aws ecr create-repository --repository-name supplier
 ```
 
-Verify: Search **ECR** in the console → Select **Repositories** → Confirm `shop` and `supplier` exist.
+Verify: Search **ECR** in the console → Select **Repositories** → Confirm `auth`, `shop` and `supplier` exist.
 
 ```bash
 # Tag local Docker images for ECR
+docker tag auth:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/auth:latest
 docker tag shop:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 docker tag supplier:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/supplier:latest
 
@@ -347,6 +403,7 @@ docker tag supplier:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/supplier:
 docker images
 
 # Push images to ECR
+docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/auth:latest
 docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/supplier:latest
 ```
@@ -368,47 +425,45 @@ Verify: In the ECR console → Select each repository → Confirm the `latest` i
 
 ### Task 5.3: Create task definition files and register them
 
-The task definition files are already in the `deployment/` directory. You need to update the placeholder values.
+The task definition files are already in the `deployment/` directory. You will use `sed` commands to automatically update the placeholder values for your specific AWS account.
 
 ```bash
 cd ~/environment/AWS_LAB/deployment
 
-# Get required values
-account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
-echo "Account ID: $account_id"
+# Automatically grab your Account ID
+account_id=$(aws sts get-caller-identity --query Account --output text)
+echo "Your Account ID: $account_id"
 
-# Get RDS endpoint (after RDS is created in Phase 6)
-# For now, note the placeholder <RDS-ENDPOINT> — you will update this after creating RDS
-```
+# Inject the Account ID into all three task definition files
+sed -i "s|<ACCOUNT-ID>|$account_id|g" taskdef-auth.json taskdef-shop.json taskdef-supplier.json
 
-Edit `taskdef-shop.json`:
-- **Line 7** (`"image"`): Replace `<IMAGE1_NAME>` with `<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/shop:latest`
-- **Line 18** (`APP_DB_HOST`): Replace `<RDS-ENDPOINT>` with the actual RDS endpoint
-- **Line 51** (`executionRoleArn`): Replace `<ACCOUNT-ID>` with your AWS account ID
-- **Line 52** (`taskRoleArn`): Replace `<ACCOUNT-ID>` with your AWS account ID
+# Inject the full ECR Image URI base into all three task definition files
+sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/auth:latest|g" taskdef-auth.json
+sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest|g" taskdef-shop.json
+sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/supplier:latest|g" taskdef-supplier.json
 
-> **IAM Note**: Both `executionRoleArn` and `taskRoleArn` use **LabRole** — the pre-configured role in AWS Academy Learner Lab. You cannot create custom IAM roles in the Learner Lab. See [IAM Roles and Permissions](#iam-roles-and-permissions-learner-lab) for details.
+# Inject the S3 Bucket name for the supplier service
+# (Only supplier service uploads product images)
+sed -i 's/"name": "S3_BUCKET", "value": ""/"name": "S3_BUCKET", "value": "b2b-marketplace-images"/g' taskdef-supplier.json
 
-Edit `taskdef-supplier.json`:
-- Same replacements as above, changing `shop` to `supplier`
-- Also add the S3 bucket environment variable (for product image uploads):
-```json
-{ "name": "S3_BUCKET", "value": "b2b-marketplace-images" }
+# NOTE: We leave <RDS-ENDPOINT> alone for now. We will replace it in Phase 6 after creating the database!
 ```
 
 Register the task definitions:
 ```bash
+aws ecs register-task-definition --cli-input-json file://taskdef-auth.json
 aws ecs register-task-definition --cli-input-json file://taskdef-shop.json
 aws ecs register-task-definition --cli-input-json file://taskdef-supplier.json
 ```
 
-Verify: In the ECS console → **Task Definitions** → Confirm `shop` and `supplier` are listed with revision 1.
+Verify: In the ECS console → **Task Definitions** → Confirm `auth`, `shop` and `supplier` are listed with revision 1.
 
 ### Task 5.4: Create CloudWatch Log Groups
 
 The task definitions reference CloudWatch log groups. Create them before running tasks:
 
 ```bash
+aws logs create-log-group --log-group-name /ecs/auth --region us-east-1
 aws logs create-log-group --log-group-name /ecs/shop --region us-east-1
 aws logs create-log-group --log-group-name /ecs/supplier --region us-east-1
 ```
@@ -416,19 +471,18 @@ aws logs create-log-group --log-group-name /ecs/supplier --region us-east-1
 ### Task 5.5: Verify the AppSpec files for CodeDeploy
 
 The AppSpec files are already created in the `deployment/` directory:
-- `appspec-shop.yaml` — references container name `shop` on port 8080
-- `appspec-supplier.yaml` — references container name `supplier` on port 8080
+- `appspec-auth.yaml` — references CodeDeploy container mapping for auth
+- `appspec-shop.yaml` — references CodeDeploy container mapping for shop
+- `appspec-supplier.yaml` — references CodeDeploy container mapping for supplier
 
 These files tell CodeDeploy how to deploy the new task definition during blue/green deployments.
 
-### Task 5.6: Reset image placeholder and push deployment files to CodeCommit
-
-Keep the `image` field as `<IMAGE1_NAME>` in both task definitions. The deploy script (Phase 9) will replace this placeholder with the actual ECR image URI during deployment.
+### Task 5.6: Push deployment files to CodeCommit
 
 ```bash
 cd ~/environment/AWS_LAB
 git add .
-git commit -m "Task definitions and AppSpec files with IMAGE1_NAME placeholder"
+git commit -m "Configured task definitions and AppSpec files"
 git push codecommit main
 ```
 
@@ -451,7 +505,7 @@ git push codecommit main
    - **VPC**: LabVPC (or default VPC if LabVPC is not available)
    - **Public access**: **Yes** (for initial setup from Cloud9; can restrict later via security groups)
    - **VPC security group**: Create new → `b2b-rds-sg`
-   - **Initial database name**: `b2bmarket`
+   - **Initial database name**: (leave blank, we will create multiple schemas later)
    - **Disable Enhanced Monitoring** (not supported in Learner Lab)
    - **Disable Performance Insights** (costs extra)
    - **Backup retention**: 1 day (minimum)
@@ -483,10 +537,7 @@ mysql -h <RDS-ENDPOINT> -u admin -p
 # Verify connection
 SHOW DATABASES;
 
-# Create the database if it doesn't exist (if you didn't set initial database name during creation)
-CREATE DATABASE IF NOT EXISTS b2bmarket;
-USE b2bmarket;
-
+# The SQL scripts will automatically create auth_db, shop_db, and supplier_db
 # Exit MySQL
 exit
 ```
@@ -498,9 +549,10 @@ mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployme
 mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/shop_db_init.sql
 ```
 
-Verify (note: you must include `-u admin -plab-password` and the database name):
+Verify (note: you must include `-u admin -plab-password` and the specific database name):
 ```bash
-mysql -h <RDS-ENDPOINT> -u admin -plab-password b2bmarket -e "SHOW TABLES;"
+# Check tables in auth_db
+mysql -h <RDS-ENDPOINT> -u admin -plab-password auth_db -e "SHOW TABLES;"
 ```
 
 You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orders`, `payments`.
@@ -510,9 +562,9 @@ You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orde
 ```bash
 cd ~/environment/AWS_LAB/deployment
 
-# Replace the placeholder in both task definition files
-# Use the actual RDS endpoint (e.g., b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com)
-sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' taskdef-shop.json taskdef-supplier.json
+# Replace the placeholder in ALL THREE task definition files
+# Substitute b2bmarket-db... with your ACTUAL RDS endpoint
+sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' taskdef-auth.json taskdef-shop.json taskdef-supplier.json
 ```
 
 > **Note**: Replace `b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com` with your actual RDS endpoint.
@@ -573,6 +625,8 @@ In the **Amazon EC2** console → **Target Groups** → **Create target group**:
 
 | Target Group Name | Type | Port | VPC | Health Check Path |
 |---|---|---|---|---|
+| `auth-tg-one` | IP addresses | 8082 | Your VPC | `/health` |
+| `auth-tg-two` | IP addresses | 8082 | Your VPC | `/health` |
 | `shop-tg-one` | IP addresses | 8080 | Your VPC | `/health` |
 | `shop-tg-two` | IP addresses | 8080 | Your VPC | `/health` |
 | `supplier-tg-one` | IP addresses | 8080 | Your VPC | `/health` |
@@ -580,7 +634,9 @@ In the **Amazon EC2** console → **Target Groups** → **Create target group**:
 
 For each target group:
 1. Select **IP addresses** as the target type
-2. Protocol: **HTTP**, Port: **8080**
+2. Protocol: **HTTP**
+   - ⚠️ **CRITICAL:** For `auth-tg-one` and `auth-tg-two`, set the Port to **8082**!
+   - For shop and supplier target groups, set the Port to **8080**!
 3. VPC: **Your VPC** (LabVPC or default VPC)
 4. Health check protocol: **HTTP**
 5. Health check path: `/health`
@@ -613,37 +669,53 @@ The final listener rules should be:
 
 | Priority | Condition | Action |
 |---|---|---|
-| 1 | Path is `/admin/*` | Forward to `supplier-tg-two` |
+| 1 | Path is `/api/auth/*`, `/login*`, `/register*` | Forward to `auth-tg-two` |
+| 2 | Path is `/api/supplier/*`, `/admin/*` | Forward to `supplier-tg-two` |
+| 3 | Path is `/api/shop/*` | Forward to `shop-tg-two` |
 | Default | All other paths | Forward to `shop-tg-two` |
 
 > **Concept (ALB Path-Based Routing)**: A single ALB routes traffic to different microservices based on URL path. This saves cost vs. multiple ALBs and provides a single entry point for the application.
 
 ---
 
-## Phase 8: Creating Two Amazon ECS Services
+## Phase 8: Creating Three Amazon ECS Services
 
 ### Task 8.1: Update the ECS service configuration files
 
-The service configuration files are in the `deployment/` directory. Update the placeholder values:
+The service configuration files are in the `deployment/` directory. You will use `sed` to automatically inject your ALB Target Groups, Subnets, and Security Groups into the JSON files.
 
-Edit `create-shop-microservice-tg-two.json`:
 ```bash
 cd ~/environment/AWS_LAB/deployment
+
+# 1. Grab your ARNs and IDs from AWS CLI automatically
+auth_tg_two_arn=$(aws elbv2 describe-target-groups --names auth-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+shop_tg_two_arn=$(aws elbv2 describe-target-groups --names shop-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+supplier_tg_two_arn=$(aws elbv2 describe-target-groups --names supplier-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+# You will need to copy your Subnet IDs and Security Group ID from the console
+# Replace these dummy values with your actual Subnet IDs and b2b-ecs-sg ID
+SUBNET_1="subnet-0123456789abcdef0"
+SUBNET_2="subnet-0abcdef1234567890"
+ECS_SG="sg-0123456789abcdef0"
+
+# 2. Inject Subnets and SG into all 3 files
+sed -i "s|<PUBLIC-SUBNET-1-ID>|$SUBNET_1|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
+sed -i "s|<PUBLIC-SUBNET-2-ID>|$SUBNET_2|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
+sed -i "s|<B2B-ECS-SG-ID>|$ECS_SG|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
+
+# 3. Inject Target Group ARNs into their corresponding files
+sed -i "s|<ARN-auth-tg-two>|$auth_tg_two_arn|g" create-auth-microservice-tg-two.json
+sed -i "s|<ARN-shop-tg-two>|$shop_tg_two_arn|g" create-shop-microservice-tg-two.json
+sed -i "s|<ARN-supplier-tg-two>|$supplier_tg_two_arn|g" create-supplier-microservice-tg-two.json
+
+# 4. Inject Revision Numbers (assuming '1' for initial creation)
+sed -i "s|<REVISION-NUMBER>|1|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
 ```
 
-Replace the following placeholders:
-- `<REVISION-NUMBER>` → Get from **ECS Console** → **Task Definitions** → `shop` → Note the latest revision number
-- `<ARN-shop-tg-two>` → Get from **EC2** → **Target Groups** → `shop-tg-two` → Copy the ARN
-- `<PUBLIC-SUBNET-1-ID>` and `<PUBLIC-SUBNET-2-ID>` → Get from **VPC** → **Subnets** → Copy the Public Subnet IDs (use the same subnets you chose for ALB)
-- `<B2B-ECS-SG-ID>` → Get from **EC2** → **Security Groups** → `b2b-ecs-sg` → Copy the Security Group ID
-
-> **⚠️ Important**: The JSON files have `"deploymentController": {"type": "CODE_DEPLOY"}`. If you plan to use the **Manual ECS Rolling Deployment** alternative (Phase 9), change this to `"type": "ECS"` in both JSON files **before creating the services**. You cannot change the deployment controller after service creation.
-
-Edit `create-supplier-microservice-tg-two.json`:
-- Same subnet and security group values
-- Change ARN to `supplier-tg-two`
-- Change containerName to `supplier`
-- Change taskDefinition to `supplier:<REVISION-NUMBER>`
+> **⚠️ Important**: The JSON files have `"deploymentController": {"type": "CODE_DEPLOY"}`. If you plan to use a **Manual ECS Rolling Deployment** instead of CodeDeploy, change this to `"type": "ECS"` in the JSON files **before creating the services**. Otherwise, AWS forbids creating CodeDeploy services without an active deployment group.
+> ```bash
+> sed -i 's/"type": "CODE_DEPLOY"/"type": "ECS"/g' create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
+> ```
 
 ### Task 8.2: Create the ECS service for the Shop microservice
 
@@ -668,6 +740,17 @@ aws ecs create-service --service-name supplier-service \
 Verify:
 1. Confirm `supplier-service` is listed in the ECS cluster
 2. Check `supplier-tg-two` has 1 healthy target
+
+### Task 8.3b: Create the ECS service for the Auth microservice
+
+```bash
+aws ecs create-service --service-name auth-service \
+  --cli-input-json file://create-auth-microservice-tg-two.json
+```
+
+Verify:
+1. Confirm `auth-service` is listed in the ECS cluster
+2. Check `auth-tg-two` has 1 healthy target
 
 ### Task 8.4: Test the application via ALB
 
@@ -744,13 +827,41 @@ aws deploy create-deployment-group \
   --blue-green-deployment-configuration "terminateBlueInstancesOnDeploymentSuccess={action=TERMINATE,terminationWaitTimeInMinutes=5},deploymentReadyOption={actionOnTimeout=CONTINUE_DEPLOYMENT}"
 ```
 
-### Task 9.3: Create a deployment group for the Supplier microservice
+### Task 9.3: Create a deployment group for the Supplier and Auth microservices
 
-Repeat the same steps (console or CLI) with:
-- **Deployment group name**: `b2b-supplier-dg`
-- **ECS service name**: Select `supplier-service`
-- **Target group 1 name**: Select `supplier-tg-two`
-- **Target group 2 name**: Select `supplier-tg-one`
+Instead of guessing the ARNs, run the following complete commands to create the CodeDeploy Deployment Groups:
+
+**1. Create Deployment Group for Supplier:**
+```bash
+supplier_tg_one_arn=$(aws elbv2 describe-target-groups --names supplier-tg-one --query 'TargetGroups[0].TargetGroupArn' --output text)
+supplier_tg_two_arn=$(aws elbv2 describe-target-groups --names supplier-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+aws deploy create-deployment-group \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-supplier-dg \
+  --service-role-arn arn:aws:iam::${account_id}:role/LabRole \
+  --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+  --ecs-services clusterName=b2b-marketplace,serviceName=supplier-service \
+  --load-balancer-info "targetGroupPairInfoList=[{targetGroups=[{name=supplier-tg-two},{name=supplier-tg-one}],prodTrafficRoute={listenerArns=[$listener_arn]}}]" \
+  --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL \
+  --blue-green-deployment-configuration "terminateBlueInstancesOnDeploymentSuccess={action=TERMINATE,terminationWaitTimeInMinutes=5},deploymentReadyOption={actionOnTimeout=CONTINUE_DEPLOYMENT}"
+```
+
+**2. Create Deployment Group for Auth:**
+```bash
+auth_tg_one_arn=$(aws elbv2 describe-target-groups --names auth-tg-one --query 'TargetGroups[0].TargetGroupArn' --output text)
+auth_tg_two_arn=$(aws elbv2 describe-target-groups --names auth-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+aws deploy create-deployment-group \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-auth-dg \
+  --service-role-arn arn:aws:iam::${account_id}:role/LabRole \
+  --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+  --ecs-services clusterName=b2b-marketplace,serviceName=auth-service \
+  --load-balancer-info "targetGroupPairInfoList=[{targetGroups=[{name=auth-tg-two},{name=auth-tg-one}],prodTrafficRoute={listenerArns=[$listener_arn]}}]" \
+  --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL \
+  --blue-green-deployment-configuration "terminateBlueInstancesOnDeploymentSuccess={action=TERMINATE,terminationWaitTimeInMinutes=5},deploymentReadyOption={actionOnTimeout=CONTINUE_DEPLOYMENT}"
+```
 
 ### Task 9.4: Trigger CodeDeploy Blue/Green Deployment via CLI (replaces CodePipeline)
 
@@ -764,20 +875,18 @@ cd ~/environment/AWS_LAB
 # Get account ID and set variables
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
 
-# Step 1: Update the task definition with the actual ECR image URI
-# (Replace <IMAGE1_NAME> with the real image URI)
-sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest|g" deployment/taskdef-shop.json
-
-# Step 2: Register the updated task definition and get the new revision ARN
+```bash
+# Step 1: Register the updated task definition and get the new revision ARN
+# (Our deploy script will reuse the existing JSON files which already contain your ECR URI)
 SHOP_TASKDEF_ARN=$(aws ecs register-task-definition \
   --cli-input-json file://deployment/taskdef-shop.json \
   --query 'taskDefinition.taskDefinitionArn' --output text)
 echo "Shop Task Definition ARN: $SHOP_TASKDEF_ARN"
 
-# Step 3: Update the appspec to use the new task definition ARN
+# Step 2: Update the appspec to use the new task definition ARN
 sed -i "s|<TASK_DEFINITION>|$SHOP_TASKDEF_ARN|g" deployment/appspec-shop.yaml
 
-# Step 4: Create the CodeDeploy deployment
+# Step 3: Create the CodeDeploy deployment
 aws deploy create-deployment \
   --application-name b2b-marketplace \
   --deployment-group-name b2b-shop-dg \
@@ -820,6 +929,29 @@ aws deploy create-deployment \
   --description "Deploy supplier service via CLI"
 ```
 
+**Deploy the Auth microservice:**
+
+```bash
+# Step 1: Update task definition with ECR image URI
+sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/auth:latest|g" deployment/taskdef-auth.json
+
+# Step 2: Register and get revision ARN
+AUTH_TASKDEF_ARN=$(aws ecs register-task-definition \
+  --cli-input-json file://deployment/taskdef-auth.json \
+  --query 'taskDefinition.taskDefinitionArn' --output text)
+echo "Auth Task Definition ARN: $AUTH_TASKDEF_ARN"
+
+# Step 3: Update appspec
+sed -i "s|<TASK_DEFINITION>|$AUTH_TASKDEF_ARN|g" deployment/appspec-auth.yaml
+
+# Step 4: Create deployment
+aws deploy create-deployment \
+  --application-name b2b-marketplace \
+  --deployment-group-name b2b-auth-dg \
+  --revision '{"revisionType":"AppSpecContent","appSpecContent":{"content":"'"$(cat deployment/appspec-auth.yaml | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" | tr -d '"')"'"}}' \
+  --description "Deploy auth service via CLI"
+```
+
 ### Task 9.5: Monitor the CodeDeploy deployment
 
 ```bash
@@ -833,62 +965,16 @@ aws deploy get-deployment --deployment-id <DEPLOYMENT-ID> \
 
 You can also monitor in the **CodeDeploy Console** → **Deployments** → Watch the blue/green traffic shift.
 
-### Task 9.6: Create a reusable deployment script (optional)
+### Task 9.6: Use the reusable deployment script
 
-To simplify future deployments, save this as `deploy.sh` in the project root:
+To simplify future deployments, a CI/CD script `deploy.sh` is already provided in your project root!
+This script automatically builds the image, pushes to ECR, updates the task definition, and triggers CodeDeploy!
 
+Make it executable:
 ```bash
-#!/bin/bash
-# Usage: ./deploy.sh shop   OR   ./deploy.sh supplier
-
-SERVICE=$1
-if [ -z "$SERVICE" ]; then
-  echo "Usage: ./deploy.sh <shop|supplier>"
-  exit 1
-fi
-
-account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
-IMAGE_URI="$account_id.dkr.ecr.us-east-1.amazonaws.com/$SERVICE:latest"
-
-echo "=== Building $SERVICE ==="
-cd ~/environment/AWS_LAB/microservices/$SERVICE
-docker build -t $SERVICE .
-
-echo "=== Pushing to ECR ==="
-docker tag $SERVICE:latest $IMAGE_URI
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $account_id.dkr.ecr.us-east-1.amazonaws.com
-docker push $IMAGE_URI
-
-echo "=== Registering new task definition ==="
-cd ~/environment/AWS_LAB/deployment
-# Create a temp copy to avoid modifying the original
-cp taskdef-$SERVICE.json /tmp/taskdef-$SERVICE-deploy.json
-sed -i "s|<IMAGE1_NAME>|$IMAGE_URI|g" /tmp/taskdef-$SERVICE-deploy.json
-sed -i "s|<ACCOUNT-ID>|$account_id|g" /tmp/taskdef-$SERVICE-deploy.json
-
-TASKDEF_ARN=$(aws ecs register-task-definition \
-  --cli-input-json file:///tmp/taskdef-$SERVICE-deploy.json \
-  --query 'taskDefinition.taskDefinitionArn' --output text)
-echo "New Task Definition: $TASKDEF_ARN"
-
-echo "=== Creating CodeDeploy deployment ==="
-# Create temp appspec with actual task def ARN
-cp appspec-$SERVICE.yaml /tmp/appspec-$SERVICE-deploy.yaml
-sed -i "s|<TASK_DEFINITION>|$TASKDEF_ARN|g" /tmp/appspec-$SERVICE-deploy.yaml
-
-# Upload to S3 and deploy
-aws s3 cp /tmp/appspec-$SERVICE-deploy.yaml s3://b2b-marketplace-images/deploy/appspec-$SERVICE.yaml
-DEPLOYMENT_ID=$(aws deploy create-deployment \
-  --application-name b2b-marketplace \
-  --deployment-group-name b2b-$SERVICE-dg \
-  --s3-location bucket=b2b-marketplace-images,key=deploy/appspec-$SERVICE.yaml,bundleType=YAML \
-  --query 'deploymentId' --output text)
-
-echo "=== Deployment started: $DEPLOYMENT_ID ==="
-echo "Monitor at: https://console.aws.amazon.com/codedeploy/home?region=us-east-1#/deployments/$DEPLOYMENT_ID"
+cd ~/environment/AWS_LAB
+chmod +x deploy.sh
 ```
-
-Make it executable: `chmod +x ~/environment/AWS_LAB/deploy.sh`
 
 Usage:
 ```bash
@@ -950,9 +1036,9 @@ chmod +x deploy.sh
 
 **Option B: Manual steps**
 ```bash
-# Rebuild the Shop image
-cd ~/environment/AWS_LAB/microservices/shop
-docker build --tag shop .
+# Rebuild the Shop image from the root context
+cd ~/environment/AWS_LAB
+docker build -t shop -f ./microservices/shop/docker/Dockerfile .
 
 # Tag and push to ECR
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)

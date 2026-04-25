@@ -1,4 +1,4 @@
-const authService = require("../../../shared/clients/auth.client");
+const authService = require("../../../../shared/clients/auth.client");
 
 // Render supplier login form
 exports.loginForm = (req, res) => {

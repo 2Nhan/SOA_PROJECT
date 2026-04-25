@@ -1,6 +1,6 @@
 const Order = require("../models/order.model");
-const supplierService = require("../clients/supplier.client");
-const authService = require("../../../shared/clients/auth.client");
+const supplierService = require("../../../../shared/clients/supplier.client");
+const authService = require("../../../../shared/clients/auth.client");
 
 exports.createForm = async (req, res) => {
   try {

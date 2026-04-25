@@ -1,6 +1,6 @@
 const RFQ = require("../models/rfq.model");
-const authService = require("../../../shared/clients/auth.client");
-const shopService = require("../clients/shop.client");
+const authService = require("../../../../shared/clients/auth.client");
+const shopService = require("../../../../shared/clients/shop.client");
 
 exports.findAll = async (req, res) => {
   try {

@@ -93,7 +93,7 @@ async function getUsersByIds(ids, fields) {
     if (!uniqueIds.length) return {};
 
     const fieldsParam = fields && fields.length ? `&fields=${fields.join(",")}` : "";
-    const url = `${AUTH_SERVICE_URL}/api/users?ids=${uniqueIds.join(",")}${fieldsParam}`;
+    const url = `${AUTH_SERVICE_URL}/api/auth/users?ids=${uniqueIds.join(",")}${fieldsParam}`;
 
     try {
         const users = await httpGet(url, TIMEOUT_MS);
@@ -113,7 +113,7 @@ async function getUsersByIds(ids, fields) {
  */
 async function getUserById(id) {
     try {
-        return await httpGet(`${AUTH_SERVICE_URL}/api/users/${id}`, TIMEOUT_MS);
+        return await httpGet(`${AUTH_SERVICE_URL}/api/auth/users/${id}`, TIMEOUT_MS);
     } catch (err) {
         console.warn(`[AuthService] getUserById(${id}) failed: ${err.message}`);
         return getFallbackUser(id);
@@ -124,7 +124,7 @@ async function getUserById(id) {
  * Get all users — for admin management
  */
 async function getAllUsers() {
-    return await httpGet(`${AUTH_SERVICE_URL}/api/users/all`, TIMEOUT_MS);
+    return await httpGet(`${AUTH_SERVICE_URL}/api/auth/users/all`, TIMEOUT_MS);
 }
 
 /**
@@ -132,7 +132,7 @@ async function getAllUsers() {
  */
 async function getUserStats() {
     try {
-        return await httpGet(`${AUTH_SERVICE_URL}/api/users/stats`, TIMEOUT_MS);
+        return await httpGet(`${AUTH_SERVICE_URL}/api/auth/users/stats`, TIMEOUT_MS);
     } catch (err) {
         console.warn(`[AuthService] getUserStats failed: ${err.message}`);
         return { totalUsers: 0, pendingUsers: 0 };
@@ -143,21 +143,21 @@ async function getUserStats() {
  * Approve user
  */
 async function approveUser(id) {
-    return await httpPost(`${AUTH_SERVICE_URL}/api/users/${id}/approve`, {}, TIMEOUT_MS);
+    return await httpPost(`${AUTH_SERVICE_URL}/api/auth/users/${id}/approve`, {}, TIMEOUT_MS);
 }
 
 /**
  * Reject user
  */
 async function rejectUser(id) {
-    return await httpPost(`${AUTH_SERVICE_URL}/api/users/${id}/reject`, {}, TIMEOUT_MS);
+    return await httpPost(`${AUTH_SERVICE_URL}/api/auth/users/${id}/reject`, {}, TIMEOUT_MS);
 }
 
 /**
  * Delete user
  */
 async function deleteUser(id) {
-    return await httpPost(`${AUTH_SERVICE_URL}/api/users/${id}/delete`, {}, TIMEOUT_MS);
+    return await httpPost(`${AUTH_SERVICE_URL}/api/auth/users/${id}/delete`, {}, TIMEOUT_MS);
 }
 
 /**

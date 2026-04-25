@@ -1,8 +1,8 @@
 const Admin = require("../models/admin.model");
 const Contract = require("../models/contract.model");
 const Product = require("../models/product.model");
-const authService = require("../../../shared/clients/auth.client");
-const shopService = require("../clients/shop.client");
+const authService = require("../../../../shared/clients/auth.client");
+const shopService = require("../../../../shared/clients/shop.client");
 
 // Dashboard with stats — aggregated from multiple services
 exports.dashboard = async (req, res) => {

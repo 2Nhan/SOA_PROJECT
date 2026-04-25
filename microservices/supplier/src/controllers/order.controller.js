@@ -1,5 +1,5 @@
-const authService = require("../../../shared/clients/auth.client");
-const shopService = require("../clients/shop.client");
+const authService = require("../../../../shared/clients/auth.client");
+const shopService = require("../../../../shared/clients/shop.client");
 const Product = require("../models/product.model");
 const Order = require("../models/order.model");
 

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { requireAuth } = require("../../../shared/middlewares/auth.middleware");
+const { requireAuth } = require("../../../../shared/middlewares/auth.middleware");
 
 // Import controllers
 const authController = require("../controllers/auth.controller");
@@ -18,14 +18,14 @@ const orderLimiter = rateLimit({
 });
 
 // --------------- INTERNAL API ROUTES ---------------
-router.get("/api/rfqs", shopApiController.findRfqs);
-router.get("/api/rfqs/all", shopApiController.findAllRfqs);
-router.get("/api/rfqs/:id", shopApiController.findOneRfq);
-router.post("/api/rfqs/:id/status", shopApiController.updateRfqStatus);
-router.get("/api/orders/all", shopApiController.findAllOrders);
-router.get("/api/orders/:id", shopApiController.findOneOrder);
-router.post("/api/orders/:id/status", shopApiController.updateOrderStatus);
-router.get("/api/stats", shopApiController.stats);
+router.get("/api/shop/rfqs", shopApiController.findRfqs);
+router.get("/api/shop/rfqs/all", shopApiController.findAllRfqs);
+router.get("/api/shop/rfqs/:id", shopApiController.findOneRfq);
+router.post("/api/shop/rfqs/:id/status", shopApiController.updateRfqStatus);
+router.get("/api/shop/orders/all", shopApiController.findAllOrders);
+router.get("/api/shop/orders/:id", shopApiController.findOneOrder);
+router.post("/api/shop/orders/:id/status", shopApiController.updateOrderStatus);
+router.get("/api/shop/stats", shopApiController.stats);
 
 // Auth routes (public)
 router.get("/login", authController.loginForm);

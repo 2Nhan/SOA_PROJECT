@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireAdmin } = require("../../../shared/middlewares/auth.middleware");
+const { requireAuth, requireAdmin } = require("../../../../shared/middlewares/auth.middleware");
 const rateLimit = require("express-rate-limit");
 
 const writeLimiter = rateLimit({
@@ -23,18 +23,18 @@ const quoteApiController = require("../api/quote.api");
 const contractApiController = require("../api/contract.api");
 
 // --------------- INTERNAL API ROUTES ---------------
-router.get("/api/products", productApiController.findByIds);
-router.get("/api/products/active", productApiController.findAllActive);
-router.get("/api/products/search", productApiController.search);
-router.get("/api/products/:id", productApiController.findOne);
-router.post("/api/products/:id/check-stock", productApiController.checkStock);
-router.post("/api/products/:id/reduce-stock", productApiController.reduceStock);
-router.post("/api/products/:id/restore-stock", productApiController.restoreStock);
-router.get("/api/quotes", quoteApiController.findByRfqIds);
-router.get("/api/quotes/:id", quoteApiController.findOne);
-router.get("/api/contracts", contractApiController.findByIds);
-router.get("/api/contracts/:id", contractApiController.findOne);
-router.get("/api/contracts/count", contractApiController.count);
+router.get("/api/supplier/products", productApiController.findByIds);
+router.get("/api/supplier/products/active", productApiController.findAllActive);
+router.get("/api/supplier/products/search", productApiController.search);
+router.get("/api/supplier/products/:id", productApiController.findOne);
+router.post("/api/supplier/products/:id/check-stock", productApiController.checkStock);
+router.post("/api/supplier/products/:id/reduce-stock", productApiController.reduceStock);
+router.post("/api/supplier/products/:id/restore-stock", productApiController.restoreStock);
+router.get("/api/supplier/quotes", quoteApiController.findByRfqIds);
+router.get("/api/supplier/quotes/:id", quoteApiController.findOne);
+router.get("/api/supplier/contracts", contractApiController.findByIds);
+router.get("/api/supplier/contracts/:id", contractApiController.findOne);
+router.get("/api/supplier/contracts/count", contractApiController.count);
 
 // Auth routes (public)
 router.get("/admin/login", authController.loginForm);

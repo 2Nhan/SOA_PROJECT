@@ -38,7 +38,11 @@
           "value": "http://<ALB-DNS-NAME>"
         },
         {
-          "name": "SHOP_SERVICE_URL",
+          "name": "S3_BUCKET",
+          "value": "b2b-marketplace-images"
+        },
+        {
+          "name": "SUPPLIER_SERVICE_URL",
           "value": "http://<ALB-DNS-NAME>"
         }
       ],

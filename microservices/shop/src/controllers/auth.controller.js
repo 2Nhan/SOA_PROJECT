@@ -1,4 +1,4 @@
-const authService = require("../../../shared/clients/auth.client");
+const authService = require("../../../../shared/clients/auth.client");
 
 exports.loginForm = (req, res) => {
   res.render("login", { error: null });

@@ -1,6 +1,6 @@
 /**
- * Supplier Service Client — HTTP client for Shop to call Supplier service
- * Used to fetch product data, check stock, etc.
+ * Supplier Service Client — HTTP client for inter-service communication
+ * Used by Shop service to fetch product data, check stock, etc.
  */
 const http = require("http");
 
@@ -92,7 +92,7 @@ async function getProductsByIds(ids, fields) {
     if (!uniqueIds.length) return {};
 
     const fieldsParam = fields && fields.length ? `&fields=${fields.join(",")}` : "";
-    const url = `${SUPPLIER_SERVICE_URL}/api/products?ids=${uniqueIds.join(",")}${fieldsParam}`;
+    const url = `${SUPPLIER_SERVICE_URL}/api/supplier/products?ids=${uniqueIds.join(",")}${fieldsParam}`;
 
     try {
         const products = await httpGet(url, TIMEOUT_MS);
@@ -111,7 +111,7 @@ async function getProductsByIds(ids, fields) {
  */
 async function getProductById(id) {
     try {
-        return await httpGet(`${SUPPLIER_SERVICE_URL}/api/products/${id}`, TIMEOUT_MS);
+        return await httpGet(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${id}`, TIMEOUT_MS);
     } catch (err) {
         console.warn(`[SupplierService] getProductById(${id}) failed: ${err.message}`);
         return getFallbackProduct(id);
@@ -119,17 +119,17 @@ async function getProductById(id) {
 }
 
 /**
- * Get all active products
+ * Get all active products (from all suppliers)
  */
 async function getAllActiveProducts() {
-    return await httpGet(`${SUPPLIER_SERVICE_URL}/api/products/active`, TIMEOUT_MS);
+    return await httpGet(`${SUPPLIER_SERVICE_URL}/api/supplier/products/active`, TIMEOUT_MS);
 }
 
 /**
  * Search products
  */
 async function searchProducts(keyword) {
-    return await httpGet(`${SUPPLIER_SERVICE_URL}/api/products/search?q=${encodeURIComponent(keyword)}`, TIMEOUT_MS);
+    return await httpGet(`${SUPPLIER_SERVICE_URL}/api/supplier/products/search?q=${encodeURIComponent(keyword)}`, TIMEOUT_MS);
 }
 
 /**
@@ -137,14 +137,14 @@ async function searchProducts(keyword) {
  * Returns { success: true, price } or throws error
  */
 async function checkAndReduceStock(productId, quantity) {
-    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/products/${productId}/reduce-stock`, { quantity }, TIMEOUT_MS);
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${productId}/check-stock`, { quantity }, TIMEOUT_MS);
 }
 
 /**
  * Restore stock — Saga compensating transaction
  */
 async function restoreStock(productId, quantity) {
-    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/products/${productId}/restore-stock`, { quantity }, TIMEOUT_MS);
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${productId}/restore-stock`, { quantity }, TIMEOUT_MS);
 }
 
 /**
@@ -152,7 +152,7 @@ async function restoreStock(productId, quantity) {
  */
 async function getQuotesByRfqIds(rfqIds) {
     if (!rfqIds || !rfqIds.length) return {};
-    const url = `${SUPPLIER_SERVICE_URL}/api/quotes?rfq_ids=${rfqIds.join(",")}`;
+    const url = `${SUPPLIER_SERVICE_URL}/api/supplier/quotes?rfq_ids=${rfqIds.join(",")}`;
     try {
         const quotes = await httpGet(url, TIMEOUT_MS);
         // Group by rfq_id for easy lookup
@@ -168,11 +168,11 @@ async function getQuotesByRfqIds(rfqIds) {
 }
 
 /**
- * Get contracts data
+ * Get contracts data (batch)
  */
 async function getContractsByIds(ids) {
     if (!ids || !ids.length) return {};
-    const url = `${SUPPLIER_SERVICE_URL}/api/contracts?ids=${ids.join(",")}`;
+    const url = `${SUPPLIER_SERVICE_URL}/api/supplier/contracts?ids=${ids.join(",")}`;
     try {
         const contracts = await httpGet(url, TIMEOUT_MS);
         return contracts.reduce((map, c) => { map[c.id] = c; return map; }, {});
@@ -183,7 +183,7 @@ async function getContractsByIds(ids) {
 }
 
 /**
- * Fallback product data
+ * Fallback product data when Supplier service is down
  */
 function getFallbackProduct(id) {
     return { id, name: "Product #" + id, price: 0, stock: 0, image_url: "", supplier_id: 0, category: "" };

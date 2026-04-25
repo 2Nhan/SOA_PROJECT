@@ -1,18 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const { requireAuth } = require("../../../shared/middlewares/auth.middleware");
+const { requireAuth } = require("../../../../shared/middlewares/auth.middleware");
 
 // Import controllers
 const authController = require("../controllers/auth.controller");
 
 // --------------- REST API ROUTES ---------------
-router.get("/api/users", authController.findByIds);
-router.get("/api/users/all", authController.getAllUsersApi);
-router.get("/api/users/stats", authController.statsApi);
-router.get("/api/users/:id", authController.findOneApi);
-router.post("/api/users/:id/approve", authController.approveUserApi);
-router.post("/api/users/:id/reject", authController.rejectUserApi);
-router.post("/api/users/:id/delete", authController.deleteUserApi);
+router.get("/api/auth/users", authController.findByIds);
+router.get("/api/auth/users/all", authController.getAllUsersApi);
+router.get("/api/auth/users/stats", authController.statsApi);
+router.get("/api/auth/users/:id", authController.findOneApi);
+router.post("/api/auth/users/:id/approve", authController.approveUserApi);
+router.post("/api/auth/users/:id/reject", authController.rejectUserApi);
+router.post("/api/auth/users/:id/delete", authController.deleteUserApi);
 router.post("/api/auth/login", authController.loginApi);
 router.post("/api/auth/register", authController.registerApi);
 

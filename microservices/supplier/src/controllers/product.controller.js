@@ -1,5 +1,5 @@
 const Product = require("../models/product.model");
-const authService = require("../../../shared/clients/auth.client");
+const authService = require("../../../../shared/clients/auth.client");
 const { upload, uploadToS3, deleteFromS3 } = require("../config/s3");
 
 exports.findAll = async (req, res) => {
