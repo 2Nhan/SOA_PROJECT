@@ -136,16 +136,16 @@ Clone the project code from GitHub to Cloud9:
 
 ```bash
 cd ~/environment
-git clone https://github.com/AsakiIchiwa/AWS_LAB.git
-cd AWS_LAB
+git clone https://github.com/2Nhan/SOA_PROJECT.git
+cd SOA_PROJECT
 ```
 
-> **Note**: The cloned directory is `AWS_LAB`. All subsequent commands in this guide use `cd ~/environment/AWS_LAB` instead of `cd ~/environment/b2b-marketplace`.
+> **Note**: The cloned directory is `SOA_PROJECT`. All subsequent commands in this guide use `cd ~/environment/SOA_PROJECT`.
 
 ### Task 3.3: Verify the project structure
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 ls -la
 ```
 
@@ -187,7 +187,7 @@ You should see:
 ### Task 3.4: Push the code to CodeCommit
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 
 # Initialize Git and commit
 git init
@@ -253,14 +253,14 @@ Both the Supplier microservice (for product images) and the CodeDeploy deploymen
 ### Task 4.2: Start a local MySQL database for testing
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 
 # Start only the MySQL container from docker-compose
 docker run -d \
   --name mysql-test \
   -e MYSQL_ROOT_PASSWORD=rootpass \
-  -e MYSQL_USER=admin \
-  -e MYSQL_PASSWORD=lab-password \
+  -e MYSQL_USER=root \
+  -e MYSQL_PASSWORD=rootpass \
   -p 3306:3306 \
   mysql:8.0
 
@@ -277,7 +277,7 @@ docker exec -i mysql-test mysql -uroot -prootpass < deployment/shop_db_init.sql
 ### Task 4.3: Build and test the Shop microservice
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 
 # Build the Docker image from the root context (so it can access shared code)
 docker build -t shop -f ./microservices/shop/docker/Dockerfile .
@@ -287,15 +287,14 @@ docker images
 
 # Run the Shop container
 docker run -d --name shop_1 -p 8080:8080 \
-  -e APP_DB_HOST="host.docker.internal" \
-  -e APP_DB_USER="admin" \
-  -e APP_DB_PASSWORD="lab-password" \
+  -e APP_DB_HOST="172.17.0.1" \
+  -e APP_DB_USER="root" \
+  -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="shop_db" \
   -e APP_DB_PORT="3306" \
   shop
 
-# Note: On Cloud9 Linux, use the Cloud9 instance's private IP instead of host.docker.internal
-# Get it with: hostname -I | awk '{print $1}'
+# Note: On Cloud9 Linux, use 172.17.0.1 (Docker Bridge Gateway) for database connectivity
 ```
 
 Test: Use **Cloud9 Preview** (Tools → Preview → Preview Running Application) or access `http://<Cloud9-Public-IP>:8080` in a browser. Confirm:
@@ -307,16 +306,19 @@ Test: Use **Cloud9 Preview** (Tools → Preview → Preview Running Application)
 ### Task 4.4: Build and test the Supplier microservice
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
+
+# Pull latest code if working across devices
+git pull origin main
 
 # Build the Docker image
 docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
 
 # Run the Supplier container
 docker run -d --name supplier_1 -p 8081:8080 \
-  -e APP_DB_HOST="host.docker.internal" \
-  -e APP_DB_USER="admin" \
-  -e APP_DB_PASSWORD="lab-password" \
+  -e APP_DB_HOST="172.17.0.1" \
+  -e APP_DB_USER="root" \
+  -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="supplier_db" \
   -e APP_DB_PORT="3306" \
   supplier
@@ -331,16 +333,16 @@ Test: Use **Cloud9 Preview** or access `http://<Cloud9-Public-IP>:8081/admin/log
 ### Task 4.4b: Build and test the Auth microservice
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 
 # Build the Docker image
 docker build -t auth -f ./microservices/auth/docker/Dockerfile .
 
 # Run the Auth container
 docker run -d --name auth_1 -p 8082:8082 \
-  -e APP_DB_HOST="host.docker.internal" \
-  -e APP_DB_USER="admin" \
-  -e APP_DB_PASSWORD="lab-password" \
+  -e APP_DB_HOST="172.17.0.1" \
+  -e APP_DB_USER="root" \
+  -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="auth_db" \
   -e APP_DB_PORT="3306" \
   auth
@@ -357,7 +359,7 @@ docker rm -f shop_1 supplier_1 auth_1 mysql-test
 ### Task 4.6: Commit and push code to CodeCommit
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 git add .
 git commit -m "Verified: all three microservices build and run correctly in Docker"
 git push codecommit main
@@ -371,12 +373,15 @@ git push codecommit main
 
 ```bash
 # Navigate to project directory
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 
-# Build Docker images first (Run this from the project root . to include 'shared/' package)
-docker build -t auth -f ./microservices/auth/docker/Dockerfile .
-docker build -t shop -f ./microservices/shop/docker/Dockerfile .
-docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
+# Pull latest code to ensure Docker images are up to date
+git pull origin main
+
+# Build Docker images first (Force clean build with --no-cache to avoid stale code)
+docker build --no-cache -t auth -f ./microservices/auth/docker/Dockerfile .
+docker build --no-cache -t shop -f ./microservices/shop/docker/Dockerfile .
+docker build --no-cache -t supplier -f ./microservices/supplier/docker/Dockerfile .
 
 # Get the Account ID
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
@@ -429,7 +434,7 @@ Verify: In the ECR console → Select each repository → Confirm the `latest` i
 The task definition files are already in the `deployment/` directory. You will use `sed` commands to automatically update the placeholder values for your specific AWS account.
 
 ```bash
-cd ~/environment/AWS_LAB/deployment
+cd ~/environment/SOA_PROJECT/deployment
 
 # Automatically grab your Account ID
 account_id=$(aws sts get-caller-identity --query Account --output text)
@@ -499,7 +504,7 @@ git push codecommit main
    - **Template**: Free tier (or Dev/Test)
    - **DB instance identifier**: `b2bmarket-db`
    - **Master username**: `admin`
-   - **Master password**: `lab-password`
+   - Master password: `rootpass`
    - **DB instance class**: `db.c6gd.medium` (Note: `db.t3.micro` may not be available in Learner Lab)
    - **Storage**: 20 GB gp3 (Note: `gp2` may not be available; use `gp3`), disable auto-scaling
    - **Multi-AZ**: **NO** (saves cost)
@@ -533,7 +538,7 @@ git push codecommit main
 
 # Connect to the database from Cloud9
 mysql -h <RDS-ENDPOINT> -u admin -p
-# Enter password: lab-password
+# Enter password: rootpass
 
 # Verify connection
 SHOW DATABASES;
@@ -543,11 +548,11 @@ SHOW DATABASES;
 exit
 ```
 
-Load the schema and seed data for the 3 databases:
+# Load the schema and seed data for the 3 databases:
 ```bash
-mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/auth_db_init.sql
-mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/supplier_db_init.sql
-mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/AWS_LAB/deployment/shop_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/auth_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/supplier_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/shop_db_init.sql
 ```
 
 Verify (note: you must include `-u admin -plab-password` and the specific database name):
@@ -561,7 +566,7 @@ You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orde
 ### Task 6.4: Update task definitions with the RDS endpoint
 
 ```bash
-cd ~/environment/AWS_LAB/deployment
+cd ~/environment/SOA_PROJECT/deployment
 
 # Replace the placeholder in ALL THREE task definition files
 # Substitute b2bmarket-db... with your ACTUAL RDS endpoint
@@ -686,7 +691,7 @@ The final listener rules should be:
 The service configuration files are in the `deployment/` directory. You will use `sed` to automatically inject your ALB Target Groups, Subnets, and Security Groups into the JSON files.
 
 ```bash
-cd ~/environment/AWS_LAB/deployment
+cd ~/environment/SOA_PROJECT/deployment
 
 # 1. Grab your ARNs and IDs from AWS CLI automatically
 auth_tg_two_arn=$(aws elbv2 describe-target-groups --names auth-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
@@ -721,7 +726,7 @@ sed -i "s|<REVISION-NUMBER>|1|g" create-auth-microservice-tg-two.json create-sho
 ### Task 8.2: Create the ECS service for the Shop microservice
 
 ```bash
-cd ~/environment/AWS_LAB/deployment
+cd ~/environment/SOA_PROJECT/deployment
 aws ecs create-service --service-name shop-service \
   --cli-input-json file://create-shop-microservice-tg-two.json
 ```
@@ -871,7 +876,7 @@ aws deploy create-deployment-group \
 **Deploy the Shop microservice:**
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 
 # Get account ID and set variables
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
@@ -973,7 +978,7 @@ This script automatically builds the image, pushes to ECR, updates the task defi
 
 Make it executable:
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 chmod +x deploy.sh
 ```
 
@@ -1020,7 +1025,7 @@ Old tasks in previous target group (tg-two) terminated after 5 minutes
 ### Task 10.1: Make a code change
 
 ```bash
-cd ~/environment/AWS_LAB/microservices/shop
+cd ~/environment/SOA_PROJECT/microservices/shop
 
 # Make a visible change (e.g., update the home page title)
 # Edit views/home.ejs — change any visible text
@@ -1030,7 +1035,7 @@ cd ~/environment/AWS_LAB/microservices/shop
 
 **Option A: Using the deploy script (recommended)**
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 chmod +x deploy.sh
 ./deploy.sh shop
 ```
@@ -1038,7 +1043,7 @@ chmod +x deploy.sh
 **Option B: Manual steps**
 ```bash
 # Rebuild the Shop image from the root context
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 docker build -t shop -f ./microservices/shop/docker/Dockerfile .
 
 # Tag and push to ECR

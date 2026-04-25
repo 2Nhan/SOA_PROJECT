@@ -72,7 +72,7 @@ Trong kiến trúc mới, Docker context là Thư Mục Root (thư mục ngoài 
 
 **Cách build thủ công (nếu cần test Docker):**
 ```bash
-# Đứng tại thư mục root AWS_LAB/
+# Đứng tại thư mục root SOA_PROJECT/
 docker build -t shop -f ./microservices/shop/docker/Dockerfile .
 ```
 Lệnh trên cho phép Docker container copy được cả thư mục code của service lẫn thư mục `shared/`.

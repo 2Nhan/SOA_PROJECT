@@ -36,6 +36,9 @@ router.get("/api/supplier/contracts", contractApiController.findByIds);
 router.get("/api/supplier/contracts/:id", contractApiController.findOne);
 router.get("/api/supplier/contracts/count", contractApiController.count);
 
+// Root redirect
+router.get("/", (req, res) => res.redirect("/admin/"));
+
 // Auth routes (public)
 router.get("/admin/login", authController.loginForm);
 router.post("/admin/login", authController.login);
