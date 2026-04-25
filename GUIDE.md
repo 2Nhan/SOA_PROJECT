@@ -486,7 +486,7 @@ These files tell CodeDeploy how to deploy the new task definition during blue/gr
 ### Task 5.6: Push deployment files to CodeCommit
 
 ```bash
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 git add .
 git commit -m "Configured task definitions and AppSpec files"
 git push codecommit main
