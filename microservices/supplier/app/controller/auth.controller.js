@@ -16,7 +16,10 @@ exports.login = (req, res) => {
 
   Auth.login(email, password, (err, user) => {
     if (err) {
-      return res.render("login", { error: "Invalid email or password" });
+      if (err.kind === "not_found") return res.render("login", { error: "Email not found" });
+      if (err.kind === "wrong_password") return res.render("login", { error: "Incorrect password" });
+      if (err.kind === "not_approved") return res.render("login", { error: "Your account is " + err.status + ". Please wait for admin approval." });
+      return res.render("login", { error: "Login failed" });
     }
     if (user.role !== "supplier" && user.role !== "admin") {
       return res.render("login", { error: "Access denied. Supplier or Admin account required." });
@@ -51,7 +54,8 @@ exports.register = (req, res) => {
 
   Auth.register({ email, full_name, password, role }, (err, user) => {
     if (err) {
-      return res.render("register", { error: err.message || "Registration failed. Email may already be in use." });
+      if (err.kind === "duplicate") return res.render("register", { error: "Email already registered" });
+      return res.render("register", { error: "Registration failed" });
     }
     res.render("login", { error: "Registration successful! Please wait for admin approval before logging in." });
   });
