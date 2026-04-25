@@ -33,7 +33,10 @@ exports.findOne = (req, res) => {
 // GET /api/products/active — all active products
 exports.findAllActive = (req, res) => {
     Product.getAllActive((err, data) => {
-        if (err) return res.status(500).json({ error: "Error retrieving products" });
+        if (err) {
+            console.error("[ProductAPI.findAllActive] DB Error:", err.message);
+            return res.status(500).json({ error: "Error retrieving products from database" });
+        }
         res.json(data);
     });
 };

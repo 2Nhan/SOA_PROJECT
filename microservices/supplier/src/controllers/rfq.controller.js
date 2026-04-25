@@ -32,10 +32,11 @@ exports.findAll = async (req, res) => {
       image_url: productMap[r.product_id]?.image_url || ""
     }));
 
+    console.log("[RFQ.findAll] Success. Enriched %d RFQs", enriched.length);
     res.render("rfq-list", { rfqs: enriched });
   } catch (err) {
-    console.error("[RFQ.findAll Error]", err.message);
-    res.status(500).render("error", { message: "Error retrieving RFQs" });
+    console.error("[RFQ.findAll Error] Critical Failure:", err.message);
+    res.status(500).render("error", { message: "Error retrieving RFQs: " + err.message });
   }
 };
 
