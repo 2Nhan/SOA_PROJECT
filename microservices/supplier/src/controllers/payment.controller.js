@@ -1,5 +1,5 @@
 const Payment = require("../models/payment.model");
-const shopService = require("../services/shopService");
+const shopClient = require("../../../../shared/clients/shop.client");
 const Product = require("../models/product.model");
 
 const VALID_METHODS = ["bank_transfer", "qr_code", "cod"];
@@ -25,7 +25,7 @@ exports.process = async (req, res) => {
 
   try {
     // Get order from Shop service — check status
-    const order = await shopService.getOrderById(orderId);
+    const order = await shopClient.getOrderById(orderId);
     if (!order) return res.render("error", { message: "Order not found" });
     if (order.status !== "confirmed") {
       return res.render("error", { message: "Order must be confirmed before payment" });
@@ -41,7 +41,7 @@ exports.process = async (req, res) => {
 
     // Update order status to 'paid' in Shop service
     try {
-      await shopService.updateOrderStatus(orderId, "paid");
+      await shopClient.updateOrderStatus(orderId, "paid");
     } catch (err) {
       // Compensating: if order update fails, payment already recorded
       console.error("[Payment] Failed to update order status:", err.message);
@@ -53,9 +53,9 @@ exports.process = async (req, res) => {
 
     // Compensating transaction: cancel order + restore stock
     try {
-      const order = await shopService.getOrderById(orderId);
+      const order = await shopClient.getOrderById(orderId);
       if (order) {
-        await shopService.updateOrderStatus(orderId, "cancelled");
+        await shopClient.updateOrderStatus(orderId, "cancelled");
         await new Promise((resolve) => {
           Product.restoreStock(order.product_id, order.quantity, () => resolve());
         });
