@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { requireAuth } = require("../../../../shared/middlewares/auth.middleware");
+const { requireShop } = require("../../../../shared/middlewares/auth.middleware");
+const { requireApiKey } = require("../../../../shared/middlewares/apikey.middleware");
 
 // Import controllers
 const authController = require("../controllers/auth.controller");
@@ -17,15 +18,15 @@ const orderLimiter = rateLimit({
     message: "Too many orders submitted. Please wait a moment."
 });
 
-// --------------- INTERNAL API ROUTES ---------------
-router.get("/api/shop/rfqs", shopApiController.findRfqs);
-router.get("/api/shop/rfqs/all", shopApiController.findAllRfqs);
-router.get("/api/shop/rfqs/:id", shopApiController.findOneRfq);
-router.post("/api/shop/rfqs/:id/status", shopApiController.updateRfqStatus);
-router.get("/api/shop/orders/all", shopApiController.findAllOrders);
-router.get("/api/shop/orders/:id", shopApiController.findOneOrder);
-router.post("/api/shop/orders/:id/status", shopApiController.updateOrderStatus);
-router.get("/api/shop/stats", shopApiController.stats);
+// --------------- INTERNAL API ROUTES (protected by API key — Fix #7) ---------------
+router.get("/api/shop/rfqs", requireApiKey, shopApiController.findRfqs);
+router.get("/api/shop/rfqs/all", requireApiKey, shopApiController.findAllRfqs);
+router.get("/api/shop/rfqs/:id", requireApiKey, shopApiController.findOneRfq);
+router.post("/api/shop/rfqs/:id/status", requireApiKey, shopApiController.updateRfqStatus);
+router.get("/api/shop/orders/all", requireApiKey, shopApiController.findAllOrders);
+router.get("/api/shop/orders/:id", requireApiKey, shopApiController.findOneOrder);
+router.post("/api/shop/orders/:id/status", requireApiKey, shopApiController.updateOrderStatus);
+router.get("/api/shop/stats", requireApiKey, shopApiController.stats);
 
 // Auth routes (public)
 router.get("/login", authController.loginForm);
@@ -35,36 +36,36 @@ router.post("/register", authController.register);
 router.get("/logout", authController.logout);
 
 // Profile (authenticated)
-router.get("/profile", requireAuth, authController.profile);
-router.post("/profile", requireAuth, authController.updateProfile);
-router.post("/profile/password", requireAuth, authController.changePassword);
+router.get("/profile", requireShop, authController.profile);
+router.post("/profile", requireShop, authController.updateProfile);
+router.post("/profile/password", requireShop, authController.changePassword);
 
 // Home
-router.get("/", requireAuth, (req, res) => {
+router.get("/", requireShop, (req, res) => {
     res.render("home");
 });
 
 // Products - read only
-router.get("/products", requireAuth, productController.findAll);
-router.get("/products/:id", requireAuth, productController.findOne);
+router.get("/products", requireShop, productController.findAll);
+router.get("/products/:id", requireShop, productController.findOne);
 
 // RFQs 
-router.get("/rfqs", requireAuth, rfqController.findAll);
-router.get("/rfqs/new/:productId", requireAuth, rfqController.createForm);
-router.post("/rfqs", requireAuth, orderLimiter, rfqController.create);
-router.get("/rfqs/:id", requireAuth, rfqController.findOne);
-router.post("/rfqs/:id/accept/:quoteId", requireAuth, orderLimiter, rfqController.acceptQuote);
-router.post("/rfqs/:id/reject/:quoteId", requireAuth, orderLimiter, rfqController.rejectQuote);
+router.get("/rfqs", requireShop, rfqController.findAll);
+router.get("/rfqs/new/:productId", requireShop, rfqController.createForm);
+router.post("/rfqs", requireShop, orderLimiter, rfqController.create);
+router.get("/rfqs/:id", requireShop, rfqController.findOne);
+router.post("/rfqs/:id/accept/:quoteId", requireShop, orderLimiter, rfqController.acceptQuote);
+router.post("/rfqs/:id/reject/:quoteId", requireShop, orderLimiter, rfqController.rejectQuote);
 
 // Contracts
-router.get("/contracts", requireAuth, contractController.findAll);
-router.get("/contracts/:id", requireAuth, contractController.findOne);
-router.post("/contracts/:id/order", requireAuth, orderLimiter, contractController.createOrder);
+router.get("/contracts", requireShop, contractController.findAll);
+router.get("/contracts/:id", requireShop, contractController.findOne);
+router.post("/contracts/:id/order", requireShop, orderLimiter, contractController.createOrder);
 
 // Orders
-router.get("/orders", requireAuth, orderController.findAll);
-router.get("/orders/new/:productId", requireAuth, orderController.createForm);
-router.post("/orders", requireAuth, orderLimiter, orderController.create);
-router.get("/orders/:id", requireAuth, orderController.findOne);
+router.get("/orders", requireShop, orderController.findAll);
+router.get("/orders/new/:productId", requireShop, orderController.createForm);
+router.post("/orders", requireShop, orderLimiter, orderController.create);
+router.get("/orders/:id", requireShop, orderController.findOne);
 
 module.exports = router;

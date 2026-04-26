@@ -4,15 +4,37 @@
  */
 const http = require("http");
 
-const SUPPLIER_SERVICE_URL = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8081";
+const SUPPLIER_SERVICE_URL = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8080"; // Fix #17: was 8081
 const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+
+function getInternalHeaders(extraHeaders = {}) {
+    if (!INTERNAL_API_KEY && process.env.NODE_ENV === "production") {
+        throw new Error("INTERNAL_API_KEY is required for inter-service calls in production");
+    }
+
+    const headers = { ...extraHeaders };
+    if (INTERNAL_API_KEY) {
+        headers["x-api-key"] = INTERNAL_API_KEY;
+    }
+    return headers;
+}
 
 /**
  * HTTP GET with timeout
  */
 function httpGet(url, timeoutMs) {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, { timeout: timeoutMs }, (res) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port,
+            path: urlObj.pathname + urlObj.search,
+            method: "GET",
+            timeout: timeoutMs,
+            headers: getInternalHeaders()
+        };
+        const req = http.request(options, (res) => {
             let data = "";
             res.on("data", (chunk) => { data += chunk; });
             res.on("end", () => {
@@ -34,6 +56,7 @@ function httpGet(url, timeoutMs) {
         req.on("error", (err) => {
             reject(new Error(`Supplier service unreachable: ${err.message}`));
         });
+        req.end();
     });
 }
 
@@ -50,10 +73,10 @@ function httpPost(url, body, timeoutMs) {
             path: urlObj.pathname,
             method: "POST",
             timeout: timeoutMs,
-            headers: {
+            headers: getInternalHeaders({
                 "Content-Type": "application/json",
                 "Content-Length": Buffer.byteLength(postData)
-            }
+            })
         };
         const req = http.request(options, (res) => {
             let data = "";
@@ -137,7 +160,7 @@ async function searchProducts(keyword) {
  * Returns { success: true, price } or throws error
  */
 async function checkAndReduceStock(productId, quantity) {
-    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${productId}/check-stock`, { quantity }, TIMEOUT_MS);
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${productId}/reduce-stock`, { quantity }, TIMEOUT_MS);
 }
 
 /**
@@ -168,7 +191,7 @@ async function getQuotesByRfqIds(rfqIds) {
 }
 
 /**
- * Get contracts data (batch)
+ * Get contracts data (batch by IDs)
  */
 async function getContractsByIds(ids) {
     if (!ids || !ids.length) return {};
@@ -180,6 +203,33 @@ async function getContractsByIds(ids) {
         console.warn(`[SupplierService] getContractsByIds failed: ${err.message}`);
         return {};
     }
+}
+
+/**
+ * Get contracts by shop_id — Fix #2: enables shop to list its contracts
+ */
+async function getContractsByShopId(shopId) {
+    const url = `${SUPPLIER_SERVICE_URL}/api/supplier/contracts/by-shop?shop_id=${shopId}`;
+    try {
+        return await httpGet(url, TIMEOUT_MS);
+    } catch (err) {
+        console.warn(`[SupplierService] getContractsByShopId failed: ${err.message}`);
+        return [];
+    }
+}
+
+/**
+ * Create a contract — Fix #3: called when shop accepts a quote
+ */
+async function createContract(contractData) {
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/contracts`, contractData, TIMEOUT_MS);
+}
+
+/**
+ * Update quote status.
+ */
+async function updateQuoteStatus(quoteId, status) {
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/quotes/${quoteId}/status`, { status }, TIMEOUT_MS);
 }
 
 /**
@@ -198,5 +248,8 @@ module.exports = {
     restoreStock,
     getQuotesByRfqIds,
     getContractsByIds,
+    getContractsByShopId,
+    createContract,
+    updateQuoteStatus,
     getFallbackProduct
 };

@@ -100,6 +100,45 @@ exports.loginApi = (req, res) => {
     });
 };
 
+// POST /api/auth/users/:id/update-profile — internal JSON profile update
+exports.updateProfileApi = (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
+
+    const full_name = (req.body.full_name || "").trim().replace(/<[^>]*>/g, "");
+    const email = (req.body.email || "").trim().toLowerCase().replace(/<[^>]*>/g, "");
+
+    if (!full_name || !email) return res.status(400).json({ error: "Name and email are required" });
+
+    Auth.updateProfile(id, { full_name, email }, (err, data) => {
+        if (err) {
+            if (err.kind === "duplicate") return res.status(409).json({ error: "Email already in use" });
+            return res.status(500).json({ error: "Error updating profile" });
+        }
+        res.json(data);
+    });
+};
+
+// POST /api/auth/users/:id/change-password — internal JSON password change
+exports.changePasswordApi = (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
+
+    const old_password = req.body.old_password || "";
+    const new_password = req.body.new_password || "";
+
+    if (!old_password || !new_password) return res.status(400).json({ error: "All password fields are required" });
+    if (new_password.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters" });
+
+    Auth.changePassword(id, old_password, new_password, (err) => {
+        if (err) {
+            if (err.kind === "wrong_password") return res.status(401).json({ error: "Current password is incorrect" });
+            return res.status(500).json({ error: "Error changing password" });
+        }
+        res.json({ success: true });
+    });
+};
+
 // POST /api/auth/register — internal JSON register
 exports.registerApi = (req, res) => {
     const email = (req.body.email || "").trim().toLowerCase().replace(/<[^>]*>/g, "");
@@ -143,8 +182,8 @@ exports.login = (req, res) => {
         req.session.user = user;
         // Role-based redirect
         if (user.role === "supplier" || user.role === "admin") {
-            const supplierUrl = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8081";
-            return res.redirect(supplierUrl + "/admin/");
+            const supplierUrl = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8080";
+            return res.redirect(supplierUrl + (user.role === "admin" ? "/admin/manage" : "/admin/"));
         }
         const shopUrl = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
         res.redirect(shopUrl + "/");

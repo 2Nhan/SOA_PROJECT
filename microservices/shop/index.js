@@ -1,62 +1,86 @@
 const express = require("express");
-const app = express();
-const path = require("path");
 const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
+const path = require("path");
 
-const dbConfig = require("./src/config/config");
 const { applyStandardMiddlewares } = require("../../shared/middlewares/standard.middleware");
-const { globalErrorHandler, notFoundHandler } = require("../../shared/middlewares/error.middleware");
+const { notFoundHandler, globalErrorHandler } = require("../../shared/middlewares/error.middleware");
 const shopRoutes = require("./src/routes/shop.routes");
 
-// Apply standard middlewares (Helmet, CORS, Morgan, Body Parser)
-applyStandardMiddlewares(app);
+const app = express();
+const PORT = process.env.PORT || 8080;
+const isProduction = process.env.NODE_ENV === "production";
+const sessionSecret = process.env.SESSION_SECRET || (isProduction ? null : "dev-session-secret-change-me");
+const sessionDbPassword = process.env.SESSION_DB_PASSWORD || process.env.APP_DB_PASSWORD;
 
+if (!sessionSecret) {
+    throw new Error("SESSION_SECRET is required in production");
+}
+if (!sessionDbPassword) {
+    throw new Error("SESSION_DB_PASSWORD or APP_DB_PASSWORD is required");
+}
+
+// View engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
-app.use(express.static(path.join(__dirname, "public"), {
-  maxAge: process.env.NODE_ENV === "production" ? "1d" : 0
-}));
 
-// Session setup
+// Standard middlewares
+applyStandardMiddlewares(app);
+
+// Session store — shared across all services via auth_db (Fix #14)
 const sessionStore = new MySQLStore({
-  host: dbConfig.HOST, port: dbConfig.PORT, user: dbConfig.USER,
-  password: dbConfig.PASSWORD, database: dbConfig.DB,
-  createDatabaseTable: true, schema: { tableName: "sessions" }
+    host: process.env.SESSION_DB_HOST || process.env.APP_DB_HOST || "localhost",
+    port: process.env.APP_DB_PORT || 3306,
+    user: process.env.SESSION_DB_USER || process.env.APP_DB_USER || "admin",
+    password: sessionDbPassword,
+    database: process.env.SESSION_DB_NAME || "auth_db"
 });
 
 app.use(session({
-  key: "b2b_session",
-  secret: process.env.SESSION_SECRET || "b2b-shared-secret-key-change-in-production",
-  store: sessionStore, resave: false, saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: "lax", maxAge: 24 * 60 * 60 * 1000 }
+    key: "b2b_session",
+    secret: sessionSecret,
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        secure: process.env.SESSION_COOKIE_SECURE === "true",
+        sameSite: "lax"
+    }
 }));
 
+// Make session user available to all views
 app.use((req, res, next) => {
-  res.locals.currentUser = req.session.user || null;
-  next();
+    res.locals.user = req.session.user || null;
+    res.locals.currentUser = req.session.user || null;
+    next();
 });
 
-// Health check
-app.get("/health", (req, res) => res.json({ status: "ok", service: "shop", uptime: process.uptime() }));
+app.get("/health", (req, res) => {
+    res.json({ status: "ok", service: "shop", uptime: process.uptime() });
+});
 
-// Mount Shop Routes
+// Routes
 app.use("/", shopRoutes);
 
-// Error Handling
+// Error handlers
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
-// Startup & Graceful Shutdown
-const PORT = process.env.PORT || 8080;
+// Start server
 const server = app.listen(PORT, () => {
-  console.log(`[Shop Service] Configured and running on port ${PORT}`);
+    console.log(`[Shop Service] Running on port ${PORT}`);
 });
 
-const pool = require("./src/config/db");
+// Graceful shutdown
 function shutdown(signal) {
-  server.close(() => { pool.end(() => { process.exit(0); }); });
-  setTimeout(() => process.exit(1), 10000);
+    console.log(`[Shop] ${signal} received. Shutting down...`);
+    server.close(() => {
+        sessionStore.close();
+        process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000);
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));

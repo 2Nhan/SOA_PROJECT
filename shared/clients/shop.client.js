@@ -6,13 +6,35 @@ const http = require("http");
 
 const SHOP_SERVICE_URL = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
 const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+
+function getInternalHeaders(extraHeaders = {}) {
+    if (!INTERNAL_API_KEY && process.env.NODE_ENV === "production") {
+        throw new Error("INTERNAL_API_KEY is required for inter-service calls in production");
+    }
+
+    const headers = { ...extraHeaders };
+    if (INTERNAL_API_KEY) {
+        headers["x-api-key"] = INTERNAL_API_KEY;
+    }
+    return headers;
+}
 
 /**
  * HTTP GET with timeout
  */
 function httpGet(url, timeoutMs) {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, { timeout: timeoutMs }, (res) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port,
+            path: urlObj.pathname + urlObj.search,
+            method: "GET",
+            timeout: timeoutMs,
+            headers: getInternalHeaders()
+        };
+        const req = http.request(options, (res) => {
             let data = "";
             res.on("data", (chunk) => { data += chunk; });
             res.on("end", () => {
@@ -50,10 +72,10 @@ function httpPost(url, body, timeoutMs) {
             path: urlObj.pathname,
             method: "POST",
             timeout: timeoutMs,
-            headers: {
+            headers: getInternalHeaders({
                 "Content-Type": "application/json",
                 "Content-Length": Buffer.byteLength(postData)
-            }
+            })
         };
         const req = http.request(options, (res) => {
             let data = "";

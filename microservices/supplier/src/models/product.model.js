@@ -35,7 +35,9 @@ Product.findByIds = (ids, result) => {
 };
 
 Product.search = (keyword, result) => {
-  const q = `%${keyword}%`;
+  // Sanitize LIKE wildcards to prevent injection of % and _ characters
+  const sanitized = keyword.replace(/[%_\\]/g, "\\$&");
+  const q = `%${sanitized}%`;
   pool.query(
     "SELECT * FROM products WHERE status = 'active' AND (name LIKE ? OR category LIKE ? OR description LIKE ?) ORDER BY created_at DESC",
     [q, q, q],
@@ -47,7 +49,7 @@ Product.search = (keyword, result) => {
 };
 
 Product.create = (newProduct, result) => {
-  pool.query("INSERT INTO products (supplier_id, name, description, price, stock, status, category, image_url) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
+  pool.query("INSERT INTO products (supplier_id, name, description, price, stock, status, category, image_url) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
     [newProduct.supplier_id, newProduct.name, newProduct.description, newProduct.price, newProduct.stock, newProduct.category, newProduct.image_url || null],
     (err, res) => {
       if (err) { result(err, null); return; }

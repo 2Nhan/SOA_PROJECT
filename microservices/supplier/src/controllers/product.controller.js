@@ -4,9 +4,10 @@ const { upload, uploadToS3, deleteFromS3 } = require("../config/s3");
 
 exports.findAll = async (req, res) => {
   try {
-    const products = await new Promise((resolve, reject) => {
+    const allProducts = await new Promise((resolve, reject) => {
       Product.getAll((err, data) => err ? reject(err) : resolve(data));
     });
+    const products = allProducts.filter(p => p.supplier_id === req.session.user.id);
 
     // Batch fetch supplier names — avoid N+1
     const supplierIds = [...new Set(products.map(p => p.supplier_id).filter(Boolean))];
@@ -27,12 +28,11 @@ exports.findAll = async (req, res) => {
 
 exports.shopPreview = async (req, res) => {
   try {
+    // Use getAllActive instead of loading all products and filtering in memory
     const products = await new Promise((resolve, reject) => {
-      Product.getAll((err, data) => err ? reject(err) : resolve(data));
+      Product.getAllActive((err, data) => err ? reject(err) : resolve(data));
     });
-    // For preview, we show all active products as a customer would see
-    const enriched = products.filter(p => p.status === 'active');
-    res.render("shop-preview", { products: enriched });
+    res.render("shop-preview", { products });
   } catch (err) {
     res.status(500).render("error", { message: "Error loading shop preview" });
   }
@@ -94,6 +94,10 @@ exports.editForm = (req, res) => {
   }
   Product.findById(id, (err, data) => {
     if (err) { res.status(404).render("error", { message: "Product not found" }); return; }
+    // Ownership check: only the product owner or admin can edit
+    if (req.session.user.role !== "admin" && data.supplier_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only edit your own products" });
+    }
     res.render("product-update", { product: data });
   });
 };
@@ -105,6 +109,14 @@ exports.update = [
       const id = parseInt(req.params.id);
       if (isNaN(id) || id < 1) {
         return res.status(400).render("error", { message: "Invalid product ID" });
+      }
+
+      // Ownership check before update
+      const existing = await new Promise((resolve, reject) => {
+        Product.findById(id, (err, data) => err ? reject(err) : resolve(data));
+      });
+      if (req.session.user.role !== "admin" && existing.supplier_id !== req.session.user.id) {
+        return res.status(403).render("error", { message: "You can only update your own products" });
       }
 
       const name = (req.body.name || "").trim().replace(/<[^>]*>/g, "");
@@ -123,7 +135,7 @@ exports.update = [
       if (req.file) {
         imageUrl = await uploadToS3(req.file);
         if (req.body.existing_image_url) {
-          await deleteFromS3(req.body.existing_image_url);
+          await deleteFromS3(req.body.existing_image_url).catch(e => console.error("[S3 Delete Error]", e.message));
         }
       }
 
@@ -139,26 +151,40 @@ exports.update = [
         res.redirect("/admin/products");
       });
     } catch (err) {
-      console.error("[S3 Upload Error]", err.message);
-      res.status(500).render("error", { message: "Error uploading image: " + err.message });
+      console.error("[Product.update Error]", err.message);
+      res.status(500).render("error", { message: "Error updating product" });
     }
   }
 ];
 
-exports.remove = (req, res) => {
+exports.remove = async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) {
     return res.status(400).render("error", { message: "Invalid product ID" });
   }
-  Product.findById(id, (err, product) => {
-    if (err) { res.status(500).render("error", { message: "Error deleting product" }); return; }
 
-    Product.remove(id, async (err) => {
-      if (err) { res.status(500).render("error", { message: "Error deleting product" }); return; }
-      if (product && product.image_url) {
-        await deleteFromS3(product.image_url);
-      }
-      res.redirect("/admin/products");
+  try {
+    const product = await new Promise((resolve, reject) => {
+      Product.findById(id, (err, data) => err ? reject(err) : resolve(data));
     });
-  });
+
+    // Ownership check: only the product owner or admin can delete
+    if (req.session.user.role !== "admin" && product.supplier_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only delete your own products" });
+    }
+
+    await new Promise((resolve, reject) => {
+      Product.remove(id, (err) => err ? reject(err) : resolve());
+    });
+
+    // Clean up S3 image after successful deletion
+    if (product.image_url) {
+      await deleteFromS3(product.image_url).catch(e => console.error("[S3 Delete Error]", e.message));
+    }
+
+    res.redirect("/admin/products");
+  } catch (err) {
+    console.error("[Product.remove Error]", err.message);
+    res.status(500).render("error", { message: "Error deleting product" });
+  }
 };

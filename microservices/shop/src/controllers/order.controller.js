@@ -12,6 +12,7 @@ exports.createForm = async (req, res) => {
     // Fetch product from Supplier service
     const product = await supplierService.getProductById(productId);
     if (!product || !product.id) return res.status(404).render("error", { message: "Product not found" });
+    if (product.status !== "active") return res.status(404).render("error", { message: "Product not found or inactive" });
 
     // Fetch supplier name
     const userMap = await authService.getUsersByIds([product.supplier_id], ["id", "full_name"]);
@@ -38,6 +39,11 @@ exports.create = async (req, res) => {
     }
 
     const note = (req.body.note || "").replace(/<[^>]*>/g, "").substring(0, 500);
+
+    const product = await supplierService.getProductById(productId);
+    if (!product || product.status !== "active") {
+      return res.render("error", { message: "Product not found or inactive" });
+    }
 
     // Saga Step 1: Check and reduce stock via Supplier API
     let stockResult;
@@ -115,6 +121,9 @@ exports.findOne = async (req, res) => {
         resolve(data);
       });
     });
+    if (order.shop_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only view your own orders" });
+    }
 
     // Parallel: product + supplier name
     const product = await supplierService.getProductById(order.product_id);

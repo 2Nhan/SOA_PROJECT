@@ -292,6 +292,8 @@ docker run -d --name shop_1 -p 8080:8080 \
   -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="shop_db" \
   -e APP_DB_PORT="3306" \
+  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
+  -e SUPPLIER_SERVICE_URL="http://172.17.0.1:8081" \
   shop
 
 # Note: On Cloud9 Linux, use 172.17.0.1 (Docker Bridge Gateway) for database connectivity
@@ -321,6 +323,8 @@ docker run -d --name supplier_1 -p 8081:8080 \
   -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="supplier_db" \
   -e APP_DB_PORT="3306" \
+  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
+  -e SHOP_SERVICE_URL="http://172.17.0.1:8080" \
   supplier
 ```
 
@@ -555,10 +559,10 @@ mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployme
 mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/shop_db_init.sql
 ```
 
-Verify (note: you must include `-u admin -plab-password` and the specific database name):
+Verify (note: use the same database password you set when creating RDS):
 ```bash
 # Check tables in auth_db
-mysql -h <RDS-ENDPOINT> -u admin -plab-password auth_db -e "SHOW TABLES;"
+mysql -h <RDS-ENDPOINT> -u admin -prootpass auth_db -e "SHOW TABLES;"
 ```
 
 You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orders`, `payments`.
@@ -571,6 +575,14 @@ cd ~/environment/SOA_PROJECT/deployment
 # Replace the placeholder in ALL THREE task definition files
 # Substitute b2bmarket-db... with your ACTUAL RDS endpoint
 sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' taskdef-auth.json taskdef-shop.json taskdef-supplier.json
+
+# Replace secret placeholders before registering/deploying task definitions
+db_password='rootpass'
+session_secret=$(openssl rand -hex 32)
+internal_api_key=$(openssl rand -hex 32)
+sed -i "s|<DB-PASSWORD>|$db_password|g" taskdef-auth.json taskdef-shop.json taskdef-supplier.json
+sed -i "s|<SESSION-SECRET>|$session_secret|g" taskdef-auth.json taskdef-shop.json taskdef-supplier.json
+sed -i "s|<INTERNAL-API-KEY>|$internal_api_key|g" taskdef-auth.json taskdef-shop.json taskdef-supplier.json
 ```
 
 > **Note**: Replace `b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com` with your actual RDS endpoint.
@@ -591,7 +603,10 @@ sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' task
 4. Create a second security group — the **ECS Tasks Security Group**:
    - **Name**: `b2b-ecs-sg`
    - **VPC**: LabVPC (or your chosen VPC)
-   - **Inbound Rules**: Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB security group)
+   - **Inbound Rules**:
+     - Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB → Shop/Supplier)
+     - Type: **Custom TCP**, Port: **8082**, Source: **Custom** → `b2b-alb-sg` (ALB → Auth)
+     - Type: **Custom TCP**, Port: **8082**, Source: **Custom** → `b2b-ecs-sg` (Shop/Supplier → Auth internal calls)
    - **Outbound Rules**: Default (all traffic — needed for ECR pulls, RDS access, S3 access, CloudWatch)
 5. Select **Create security group**
 6. Update the RDS security group (`b2b-rds-sg`) to allow traffic from ECS:
@@ -605,11 +620,14 @@ The final layered network architecture:
 │  Inbound:  TCP 80 from 0.0.0.0/0 (Internet)             │
 │  Outbound: All traffic                                  │
 └──────────────────────┬──────────────────────────────────┘
-                       │ TCP 8080
+                       │ TCP 8080 (Shop/Supplier)
+                       │ TCP 8082 (Auth)
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │  b2b-ecs-sg (ECS Tasks Security Group)                  │
-│  Inbound:  TCP 8080 from b2b-alb-sg only                │
+│  Inbound:  TCP 8080 from b2b-alb-sg                     │
+│            TCP 8082 from b2b-alb-sg                     │
+│            TCP 8082 from b2b-ecs-sg (internal Auth calls)│
 │  Outbound: All traffic (ECR, S3, CloudWatch, RDS)       │
 └──────────────────────┬──────────────────────────────────┘
                        │ TCP 3306
@@ -1198,7 +1216,7 @@ Since Learner Lab does not allow custom IAM users/groups/roles, role-based acces
 |---|---|---|
 | **IAM Users** | `users` table in MySQL | Each user has `id`, `email`, `password_hash`, `role`, `status` |
 | **IAM Groups** | `role` field: `shop`, `supplier`, `admin` | Three roles with different permission sets |
-| **IAM Policies** | Express middleware | `requireAuth` (identity-based) and `requireAdmin` (resource-based) |
+| **IAM Policies** | Express middleware | `requireAuth`, `requireShop`, `requireSupplier`, and `requireAdmin` |
 | **Authentication** | `bcryptjs` + `express-session` | Like IAM login — verify identity before granting access |
 | **Authorization** | Role checks in middleware | Like IAM policy evaluation — check if role allows the action |
 | **Least Privilege** | Each role only accesses its own routes | Shop can't access `/admin/*`, Supplier can't access Shop-only routes |
@@ -1221,6 +1239,8 @@ Since Learner Lab does not allow custom IAM users/groups/roles, role-based acces
 | System dashboard | ❌ | ❌ | ✅ |
 
 #### How It Works in Code
+
+The live implementation is centralized in `shared/middlewares/auth.middleware.js`; individual services import role-specific guards instead of redefining separate middleware copies.
 
 ```javascript
 // Shop Service — Authentication middleware (like IAM identity verification)
@@ -1336,7 +1356,7 @@ In a real production environment, you would create separate IAM roles per servic
 | Layer | Implementation | Description |
 |---|---|---|
 | Authentication | `bcryptjs` + `express-session` | Password hashing (10 salt rounds), session-based login |
-| Auth Middleware | `requireAuth`, `requireAdmin` | All routes protected; admin routes require admin role |
+| Auth Middleware | `requireAuth`, `requireShop`, `requireSupplier`, `requireAdmin` | Routes are protected by role; admin routes require admin role |
 | HTTP Headers | `helmet` | X-XSS-Protection, X-Content-Type-Options, HSTS, X-Frame-Options |
 | CORS | `cors` | Configurable origin restriction via `ALLOWED_ORIGINS` env var |
 | Rate Limiting | `express-rate-limit` | Global: 200 req/15min per IP. Write ops: 10-20 req/min |
@@ -1356,7 +1376,7 @@ In a real production environment, you would create separate IAM roles per servic
 | **Network Isolation** | RDS in private-like configuration (only accessible from ECS security group, not internet) |
 | **Encryption in Transit** | ALB handles HTTP traffic. In production, add ACM certificate for HTTPS (TLS termination at ALB). |
 | **Encryption at Rest** | RDS supports encryption at rest (enabled by default for new instances). S3 uses server-side encryption. |
-| **No Hardcoded Secrets** | Database credentials passed via ECS task definition environment variables. In production, use AWS Secrets Manager. |
+| **No Hardcoded Secrets** | Database credentials, `SESSION_SECRET`, and `INTERNAL_API_KEY` are passed via environment variables. In production, use AWS Secrets Manager. |
 | **Automated Deployments** | CodeDeploy blue/green deployments eliminate manual access to production servers. No SSH needed. Deploy script automates the CLI workflow. |
 
 ---

@@ -4,10 +4,13 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: lab-password
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      APP_DB_USER: ${APP_DB_USER:-admin}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
     ports:
       - "3306:3306"
     volumes:
+      - ./deployment/00-create-user.sh:/docker-entrypoint-initdb.d/00-create-user.sh
       - ./deployment/auth_db_init.sql:/docker-entrypoint-initdb.d/01-auth.sql
       - ./deployment/supplier_db_init.sql:/docker-entrypoint-initdb.d/02-supplier.sql
       - ./deployment/shop_db_init.sql:/docker-entrypoint-initdb.d/03-shop.sql
@@ -17,15 +20,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: >
-      --default-authentication-plugin=mysql_native_password
-      --init-connect="
-        CREATE USER IF NOT EXISTS 'admin'@'%' IDENTIFIED BY 'lab-password';
-        GRANT ALL PRIVILEGES ON auth_db.* TO 'admin'@'%';
-        GRANT ALL PRIVILEGES ON shop_db.* TO 'admin'@'%';
-        GRANT ALL PRIVILEGES ON supplier_db.* TO 'admin'@'%';
-        FLUSH PRIVILEGES;
-      "
+    command: --default-authentication-plugin=mysql_native_password
 
   auth:
     build: 
@@ -35,13 +30,20 @@ services:
       - "8082:8082"
     environment:
       APP_DB_HOST: db
-      APP_DB_USER: root
-      APP_DB_PASSWORD: lab-password
+      APP_DB_USER: ${APP_DB_USER:-admin}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
       APP_DB_NAME: auth_db
       APP_DB_PORT: 3306
       PORT: 8082
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      SESSION_DB_HOST: db
+      SESSION_DB_USER: ${APP_DB_USER:-admin}
+      SESSION_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
+      SESSION_DB_NAME: auth_db
+      NODE_ENV: ${NODE_ENV:-development}
       SHOP_SERVICE_URL: http://shop:8080
       SUPPLIER_SERVICE_URL: http://supplier:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
     depends_on:
       db:
         condition: service_healthy
@@ -54,13 +56,20 @@ services:
       - "8080:8080"
     environment:
       APP_DB_HOST: db
-      APP_DB_USER: root
-      APP_DB_PASSWORD: lab-password
+      APP_DB_USER: ${APP_DB_USER:-admin}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
       APP_DB_NAME: shop_db
       APP_DB_PORT: 3306
       PORT: 8080
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      SESSION_DB_HOST: db
+      SESSION_DB_USER: ${APP_DB_USER:-admin}
+      SESSION_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
+      SESSION_DB_NAME: auth_db
+      NODE_ENV: ${NODE_ENV:-development}
       AUTH_SERVICE_URL: http://auth:8082
       SUPPLIER_SERVICE_URL: http://supplier:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
     depends_on:
       db:
         condition: service_healthy
@@ -75,13 +84,21 @@ services:
       - "8081:8080"
     environment:
       APP_DB_HOST: db
-      APP_DB_USER: root
-      APP_DB_PASSWORD: lab-password
+      APP_DB_USER: ${APP_DB_USER:-admin}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
       APP_DB_NAME: supplier_db
       APP_DB_PORT: 3306
       PORT: 8080
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      SESSION_DB_HOST: db
+      SESSION_DB_USER: ${APP_DB_USER:-admin}
+      SESSION_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
+      SESSION_DB_NAME: auth_db
+      NODE_ENV: ${NODE_ENV:-development}
       AUTH_SERVICE_URL: http://auth:8082
       SHOP_SERVICE_URL: http://shop:8080
+      SUPPLIER_SERVICE_URL: http://supplier:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
     depends_on:
       db:
         condition: service_healthy

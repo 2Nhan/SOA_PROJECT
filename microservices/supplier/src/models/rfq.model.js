@@ -25,4 +25,11 @@ RFQ.getQuoteByRfqId = (rfqId, result) => {
   });
 };
 
+RFQ.deleteQuoteById = (id, result) => {
+  pool.query("DELETE FROM quotes WHERE id = ?", [id], (err, res) => {
+    if (err) { result(err, null); return; }
+    result(null, { id, deleted: res.affectedRows > 0 });
+  });
+};
+
 module.exports = RFQ;

@@ -49,6 +49,9 @@ exports.findOne = async (req, res) => {
         resolve(data);
       });
     });
+    if (contract.supplier_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only view your own contracts" });
+    }
 
     // Fetch product locally + user names from Auth — parallel
     const userIds = [contract.shop_id, contract.supplier_id].filter(Boolean);
@@ -80,17 +83,29 @@ exports.findOne = async (req, res) => {
 exports.confirm = (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) return res.status(400).render("error", { message: "Invalid contract ID" });
-  Contract.confirm(id, (err) => {
-    if (err) return res.status(500).render("error", { message: "Error confirming contract" });
-    res.redirect("/admin/contracts/" + id);
+  Contract.findById(id, (err, contract) => {
+    if (err) return res.status(404).render("error", { message: "Contract not found" });
+    if (contract.supplier_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only confirm your own contracts" });
+    }
+    Contract.confirm(id, (err) => {
+      if (err) return res.status(500).render("error", { message: "Error confirming contract" });
+      res.redirect("/admin/contracts/" + id);
+    });
   });
 };
 
 exports.cancel = (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id) || id < 1) return res.status(400).render("error", { message: "Invalid contract ID" });
-  Contract.cancel(id, (err) => {
-    if (err) return res.status(500).render("error", { message: "Error cancelling contract" });
-    res.redirect("/admin/contracts");
+  Contract.findById(id, (err, contract) => {
+    if (err) return res.status(404).render("error", { message: "Contract not found" });
+    if (contract.supplier_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only cancel your own contracts" });
+    }
+    Contract.cancel(id, (err) => {
+      if (err) return res.status(500).render("error", { message: "Error cancelling contract" });
+      res.redirect("/admin/contracts");
+    });
   });
 };
