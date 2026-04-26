@@ -150,6 +150,7 @@ ls -la
 ```
 
 You should see:
+```text
 ├── GUIDE.md
 ├── README.md
 ├── deploy.sh
@@ -929,7 +930,6 @@ cd ~/environment/SOA_PROJECT
 # Get account ID and set variables
 account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
 
-```bash
 # Step 1: Register the updated task definition and get the new revision ARN
 # (Our deploy script will reuse the existing JSON files which already contain your ECR URI)
 SHOP_TASKDEF_ARN=$(aws ecs register-task-definition \
