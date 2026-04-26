@@ -18,10 +18,14 @@ exports.applyStandardMiddlewares = (app) => {
                 fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
                 imgSrc: ["'self'", "data:", "https:", "*.unsplash.com", "*.amazonaws.com"],
                 connectSrc: ["'self'"],
+                // ALB serves HTTP only — do not tell browsers to upgrade to HTTPS
+                upgradeInsecureRequests: null,
             }
         },
         // Allow Cloud9 Preview and ALB health checks to embed in iframe
-        frameguard: false
+        frameguard: false,
+        // ALB has no HTTPS — disable HSTS so browsers don't force HTTPS
+        hsts: false,
     }));
 
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
