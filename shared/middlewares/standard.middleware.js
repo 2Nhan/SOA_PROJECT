@@ -20,7 +20,10 @@ exports.applyStandardMiddlewares = (app) => {
                 fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"],
                 connectSrc: ["'self'"],
                 frameSrc: ["'none'"],
-                objectSrc: ["'none'"]
+                objectSrc: ["'none'"],
+                // Disable upgrade-insecure-requests so browsers don't force HTTPS
+                // (ALB serves HTTP only; without this the browser upgrades to HTTPS → timeout)
+                upgradeInsecureRequests: []
             }
         },
         // Allow Cloud9 Preview and ALB health checks to embed in iframe
