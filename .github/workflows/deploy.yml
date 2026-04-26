@@ -1,0 +1,231 @@
+name: Deploy to AWS ECS (Blue/Green)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (shop, supplier, auth, or all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - shop
+          - supplier
+          - auth
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: b2b-marketplace-images
+  CODEDEPLOY_APP: b2b-marketplace
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Step 1: Detect which services changed
+  # ──────────────────────────────────────────────
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      shop: ${{ steps.changes.outputs.shop }}
+      supplier: ${{ steps.changes.outputs.supplier }}
+      auth: ${{ steps.changes.outputs.auth }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check changed files
+        id: changes
+        run: |
+          # If manual trigger, use the selected service
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            SERVICE="${{ github.event.inputs.service }}"
+            if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "shop" ]; then echo "shop=true" >> $GITHUB_OUTPUT; else echo "shop=false" >> $GITHUB_OUTPUT; fi
+            if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "supplier" ]; then echo "supplier=true" >> $GITHUB_OUTPUT; else echo "supplier=false" >> $GITHUB_OUTPUT; fi
+            if [ "$SERVICE" == "all" ] || [ "$SERVICE" == "auth" ]; then echo "auth=true" >> $GITHUB_OUTPUT; else echo "auth=false" >> $GITHUB_OUTPUT; fi
+            exit 0
+          fi
+
+          # For push events, detect changes
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          # shared/ changes affect all services
+          if echo "$CHANGED" | grep -q "^shared/"; then
+            echo "shop=true" >> $GITHUB_OUTPUT
+            echo "supplier=true" >> $GITHUB_OUTPUT
+            echo "auth=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if echo "$CHANGED" | grep -q "^microservices/shop/"; then echo "shop=true" >> $GITHUB_OUTPUT; else echo "shop=false" >> $GITHUB_OUTPUT; fi
+          if echo "$CHANGED" | grep -q "^microservices/supplier/"; then echo "supplier=true" >> $GITHUB_OUTPUT; else echo "supplier=false" >> $GITHUB_OUTPUT; fi
+          if echo "$CHANGED" | grep -q "^microservices/auth/"; then echo "auth=true" >> $GITHUB_OUTPUT; else echo "auth=false" >> $GITHUB_OUTPUT; fi
+
+  # ──────────────────────────────────────────────
+  # Step 2: Build, Push, and Deploy each service
+  # ──────────────────────────────────────────────
+  deploy-shop:
+    name: Deploy Shop Service
+    needs: detect-changes
+    if: needs.detect-changes.outputs.shop == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build -t shop -f ./microservices/shop/docker/Dockerfile .
+          docker tag shop:latest $ECR_REGISTRY/shop:latest
+          docker tag shop:latest $ECR_REGISTRY/shop:${{ github.sha }}
+          docker push $ECR_REGISTRY/shop:latest
+          docker push $ECR_REGISTRY/shop:${{ github.sha }}
+
+      - name: Register new Task Definition
+        id: taskdef
+        run: |
+          TASKDEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://deployment/taskdef-shop.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+          echo "✅ Registered: $TASKDEF_ARN"
+
+      - name: Deploy via CodeDeploy (Blue/Green)
+        run: |
+          # Create appspec with real task def ARN
+          cp deployment/appspec-shop.yaml /tmp/appspec-shop.yaml
+          sed -i "s|<TASK_DEFINITION>|${{ steps.taskdef.outputs.arn }}|g" /tmp/appspec-shop.yaml
+
+          # Upload to S3
+          aws s3 cp /tmp/appspec-shop.yaml s3://${{ env.S3_BUCKET }}/deploy/appspec-shop.yaml
+
+          # Trigger CodeDeploy
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name ${{ env.CODEDEPLOY_APP }} \
+            --deployment-group-name b2b-shop-dg \
+            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-shop.yaml,bundleType=YAML \
+            --query 'deploymentId' --output text)
+          echo "🚀 Shop deployment started: $DEPLOYMENT_ID"
+          echo "Monitor: https://console.aws.amazon.com/codedeploy/home?region=${{ env.AWS_REGION }}#/deployments/$DEPLOYMENT_ID"
+
+  deploy-supplier:
+    name: Deploy Supplier Service
+    needs: detect-changes
+    if: needs.detect-changes.outputs.supplier == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
+          docker tag supplier:latest $ECR_REGISTRY/supplier:latest
+          docker tag supplier:latest $ECR_REGISTRY/supplier:${{ github.sha }}
+          docker push $ECR_REGISTRY/supplier:latest
+          docker push $ECR_REGISTRY/supplier:${{ github.sha }}
+
+      - name: Register new Task Definition
+        id: taskdef
+        run: |
+          TASKDEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://deployment/taskdef-supplier.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+          echo "✅ Registered: $TASKDEF_ARN"
+
+      - name: Deploy via CodeDeploy (Blue/Green)
+        run: |
+          cp deployment/appspec-supplier.yaml /tmp/appspec-supplier.yaml
+          sed -i "s|<TASK_DEFINITION>|${{ steps.taskdef.outputs.arn }}|g" /tmp/appspec-supplier.yaml
+
+          aws s3 cp /tmp/appspec-supplier.yaml s3://${{ env.S3_BUCKET }}/deploy/appspec-supplier.yaml
+
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name ${{ env.CODEDEPLOY_APP }} \
+            --deployment-group-name b2b-supplier-dg \
+            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-supplier.yaml,bundleType=YAML \
+            --query 'deploymentId' --output text)
+          echo "🚀 Supplier deployment started: $DEPLOYMENT_ID"
+
+  deploy-auth:
+    name: Deploy Auth Service
+    needs: detect-changes
+    if: needs.detect-changes.outputs.auth == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build -t auth -f ./microservices/auth/docker/Dockerfile .
+          docker tag auth:latest $ECR_REGISTRY/auth:latest
+          docker tag auth:latest $ECR_REGISTRY/auth:${{ github.sha }}
+          docker push $ECR_REGISTRY/auth:latest
+          docker push $ECR_REGISTRY/auth:${{ github.sha }}
+
+      - name: Register new Task Definition
+        id: taskdef
+        run: |
+          TASKDEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://deployment/taskdef-auth.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
+          echo "✅ Registered: $TASKDEF_ARN"
+
+      - name: Deploy via CodeDeploy (Blue/Green)
+        run: |
+          cp deployment/appspec-auth.yaml /tmp/appspec-auth.yaml
+          sed -i "s|<TASK_DEFINITION>|${{ steps.taskdef.outputs.arn }}|g" /tmp/appspec-auth.yaml
+
+          aws s3 cp /tmp/appspec-auth.yaml s3://${{ env.S3_BUCKET }}/deploy/appspec-auth.yaml
+
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name ${{ env.CODEDEPLOY_APP }} \
+            --deployment-group-name b2b-auth-dg \
+            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-auth.yaml,bundleType=YAML \
+            --query 'deploymentId' --output text)
+          echo "🚀 Auth deployment started: $DEPLOYMENT_ID"
