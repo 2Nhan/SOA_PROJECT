@@ -44,6 +44,7 @@ function httpGet(url, timeoutMs) {
         req.on("error", (err) => {
             reject(new Error(`Auth service unreachable: ${err.message}`));
         });
+        req.end();
     });
 }
 
