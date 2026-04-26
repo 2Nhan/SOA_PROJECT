@@ -379,6 +379,11 @@ docker rm -f shop_1 supplier_1 auth_1 mysql-test
 
 ```bash
 cd ~/environment/SOA_PROJECT
+
+# If you re-cloned from GitHub, re-add the CodeCommit remote (skip if already added in Task 3.4)
+git remote get-url codecommit 2>/dev/null || \
+  git remote add codecommit https://git-codecommit.us-east-1.amazonaws.com/v1/repos/b2b-marketplace
+
 git add .
 git commit -m "Verified: all three microservices build and run correctly in Docker"
 git push codecommit main
@@ -506,6 +511,11 @@ These files tell CodeDeploy how to deploy the new task definition during blue/gr
 
 ```bash
 cd ~/environment/SOA_PROJECT
+
+# Re-add CodeCommit remote if missing (e.g., after re-cloning from GitHub)
+git remote get-url codecommit 2>/dev/null || \
+  git remote add codecommit https://git-codecommit.us-east-1.amazonaws.com/v1/repos/b2b-marketplace
+
 git add .
 git commit -m "Configured task definitions and AppSpec files"
 git push codecommit main
