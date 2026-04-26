@@ -184,14 +184,26 @@ Cả 3 lệnh phải trả về thông tin phiên bản. Cloud9 trên Amazon Lin
 
 ### Task 2.3: Tăng dung lượng đĩa (nếu cần)
 
+1. Truy cập **EC2 Console** → **Instances**.
+2. Chọn instance của Cloud9 (thường có tên `aws-cloud9-...`).
+3. Chọn thẻ **Storage** → Bấm vào **Volume ID**.
+4. Chọn Volume → **Actions** → **Modify volume**.
+5. Thay đổi Size lên **20GB** → Bấm **Modify**.
+
+Sau đó quay lại terminal Cloud9 chạy lệnh:
+
 ```bash
 # Kiểm tra dung lượng hiện tại
 df -h
 
-# Nếu thiếu: vào EC2 Console → Volumes → Modify → Tăng lên 20GB
-# Rồi chạy:
-sudo growpart /dev/xvda 1
-sudo resize2fs /dev/xvda1
+# Mở rộng partition (cho NVMe disk trên Cloud9 mới)
+sudo growpart /dev/nvme0n1 1
+
+# Mở rộng file system (XFS trên Amazon Linux 2)
+sudo xfs_growfs -d /
+
+# Kiểm tra lại kết quả
+df -h
 ```
 
 ---
@@ -268,6 +280,15 @@ git push -u codecommit main
 3. Bấm **Create folder**
 
 > ⚠️ Nếu dùng tên bucket khác, phải update `S3_BUCKET` trong `taskdef-supplier.json`, `deploy.sh`, và `.github/workflows/deploy.yml`.
+# 1. Cập nhật trong Task Definition của Supplier
+sed -i 's/b2b-marketplace-images/{Tên bucket của bạn}/g' deployment/taskdef-supplier.json
+
+# 2. Cập nhật trong script deploy thủ công
+sed -i 's/b2b-marketplace-images/{Tên bucket của bạn}/g' deploy.sh
+
+# 3. Cập nhật trong file workflow của GitHub Actions
+sed -i 's/b2b-marketplace-images/{Tên bucket của bạn}/g' .github/workflows/deploy.yml
+
 
 ---
 
@@ -275,11 +296,11 @@ git push -u codecommit main
 
 ### Task 4.1: Mở cổng trên Security Group của Cloud9
 
-1. Trong **EC2 Console**, tìm Security Group của Cloud9 instance
+1. Trong **EC2 Console**, vào tab Security chọn link ở Security Group của Cloud9 instance
 2. Bấm **Edit Inbound Rules** → Thêm 3 rules:
-   - Custom TCP, Port **8080**, Source: `0.0.0.0/0`
-   - Custom TCP, Port **8081**, Source: `0.0.0.0/0`
-   - Custom TCP, Port **8082**, Source: `0.0.0.0/0`
+   - Custom TCP, Port **8080**, Source: `0.0.0.0/0`(AnywhereV4)
+   - Custom TCP, Port **8081**, Source: `0.0.0.0/0`(AnywhereV4)
+   - Custom TCP, Port **8082**, Source: `0.0.0.0/0`(AnywhereV4)
 3. Bấm **Save rules**
 
 ### Task 4.2: Chạy MySQL test local
@@ -303,43 +324,7 @@ docker exec -i mysql-test mysql -uroot -prootpass < deployment/supplier_db_init.
 docker exec -i mysql-test mysql -uroot -prootpass < deployment/shop_db_init.sql
 ```
 
-### Task 4.3: Build và test Shop microservice
-
-```bash
-cd ~/environment/SOA_PROJECT
-docker build -t shop -f ./microservices/shop/docker/Dockerfile .
-
-docker run -d --name shop_1 -p 8080:8080 \
-  -e APP_DB_HOST="172.17.0.1" \
-  -e APP_DB_USER="root" \
-  -e APP_DB_PASSWORD="rootpass" \
-  -e APP_DB_NAME="shop_db" \
-  -e APP_DB_PORT="3306" \
-  shop
-```
-
-Kiểm tra: Dùng **Cloud9 Preview** hoặc truy cập `http://<Cloud9-Public-IP>:8080`. Xác nhận:
-- Trang login hiển thị tại `/`
-- Health check hoạt động tại `/health`
-
-### Task 4.4: Build và test Supplier microservice
-
-```bash
-cd ~/environment/SOA_PROJECT
-docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
-
-docker run -d --name supplier_1 -p 8081:8080 \
-  -e APP_DB_HOST="172.17.0.1" \
-  -e APP_DB_USER="root" \
-  -e APP_DB_PASSWORD="rootpass" \
-  -e APP_DB_NAME="supplier_db" \
-  -e APP_DB_PORT="3306" \
-  supplier
-```
-
-Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8081/admin/login`.
-
-### Task 4.5: Build và test Auth microservice
+### Task 4.3: Build và test Auth microservice
 
 ```bash
 cd ~/environment/SOA_PROJECT
@@ -355,6 +340,43 @@ docker run -d --name auth_1 -p 8082:8082 \
 ```
 
 Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8082/health` → phải trả về `{"status":"ok"}`.
+
+### Task 4.4: Build và test Shop microservice
+
+```bash
+cd ~/environment/SOA_PROJECT
+docker build -t shop -f ./microservices/shop/docker/Dockerfile .
+
+docker run -d --name shop_1 -p 8080:8080 \
+  -e APP_DB_HOST="172.17.0.1" \
+  -e APP_DB_USER="root" \
+  -e APP_DB_PASSWORD="rootpass" \
+  -e APP_DB_NAME="shop_db" \
+  -e APP_DB_PORT="3306" \
+  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
+  -e SUPPLIER_SERVICE_URL="http://172.17.0.1:8081" \
+  shop
+```
+
+Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8080`. Thử đăng nhập với `shop1@b2bmarket.com` / `password123`.
+
+### Task 4.5: Build và test Supplier microservice
+
+```bash
+cd ~/environment/SOA_PROJECT
+docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
+
+docker run -d --name supplier_1 -p 8081:8080 \
+  -e APP_DB_HOST="172.17.0.1" \
+  -e APP_DB_USER="root" \
+  -e APP_DB_PASSWORD="rootpass" \
+  -e APP_DB_NAME="supplier_db" \
+  -e APP_DB_PORT="3306" \
+  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
+  supplier
+```
+
+Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8081/admin/login`.
 
 ### Task 4.6: Dọn dẹp test containers
 

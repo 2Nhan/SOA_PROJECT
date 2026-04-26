@@ -5,7 +5,7 @@
 const http = require("http");
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8082";
-const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
+const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 8000;
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "b2b-internal-key-change-in-production";
 
 /**

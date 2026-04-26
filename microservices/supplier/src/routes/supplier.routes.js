@@ -35,8 +35,8 @@ router.get("/api/supplier/quotes", requireInternalApiKey, quoteApiController.fin
 router.get("/api/supplier/quotes/:id", requireInternalApiKey, quoteApiController.findOne);
 router.get("/api/supplier/contracts", requireInternalApiKey, contractApiController.findByIds);
 router.get("/api/supplier/contracts/by-shop", requireInternalApiKey, contractApiController.findByShopId);
-router.get("/api/supplier/contracts/:id", requireInternalApiKey, contractApiController.findOne);
 router.get("/api/supplier/contracts/count", requireInternalApiKey, contractApiController.count);
+router.get("/api/supplier/contracts/:id", requireInternalApiKey, contractApiController.findOne);
 router.post("/api/supplier/contracts", requireInternalApiKey, contractApiController.createContract);
 
 // Root redirect

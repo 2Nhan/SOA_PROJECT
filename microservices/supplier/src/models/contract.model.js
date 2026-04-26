@@ -49,8 +49,8 @@ Contract.getAll = (result) => {
 // Create a new contract (from accepted quote)
 Contract.create = (data, result) => {
   pool.query(
-    "INSERT INTO contracts (shop_id, supplier_id, product_id, quantity, unit_price, total_amount, status) VALUES (?, ?, ?, ?, ?, ?, 'draft')",
-    [data.shop_id, data.supplier_id, data.product_id, data.quantity, data.unit_price, data.unit_price * data.quantity,],
+    "INSERT INTO contracts (quote_id, shop_id, supplier_id, product_id, quantity, unit_price, total_amount, delivery_days, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft')",
+    [data.quote_id, data.shop_id, data.supplier_id, data.product_id, data.quantity, data.unit_price, data.unit_price * data.quantity, data.delivery_days || 7],
     (err, res) => {
       if (err) { result(err, null); return; }
       result(null, { id: res.insertId, status: "draft" });

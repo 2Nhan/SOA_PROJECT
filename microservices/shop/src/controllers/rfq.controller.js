@@ -173,11 +173,13 @@ exports.acceptQuote = async (req, res) => {
       // Create contract via Supplier API
       try {
         await supplierService.createContractFromQuote({
+          quote_id: quote.id,
           shop_id: shopId,
           supplier_id: rfq.supplier_id,
           product_id: rfq.product_id,
           quantity: rfq.quantity,
-          unit_price: quote.unit_price
+          unit_price: quote.unit_price,
+          delivery_days: quote.delivery_days || 7
         });
       } catch (contractErr) {
         console.error("[RFQ.acceptQuote] Contract creation failed:", contractErr.message);

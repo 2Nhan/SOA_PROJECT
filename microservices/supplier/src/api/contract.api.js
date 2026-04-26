@@ -38,12 +38,12 @@ exports.count = (req, res) => {
 
 // POST /api/supplier/contracts — Create contract from accepted quote
 exports.createContract = (req, res) => {
-    const { shop_id, supplier_id, product_id, quantity, unit_price } = req.body;
+    const { quote_id, shop_id, supplier_id, product_id, quantity, unit_price, delivery_days } = req.body;
     if (!shop_id || !supplier_id || !product_id || !quantity || !unit_price) {
         return res.status(400).json({ error: "Missing required fields" });
     }
 
-    Contract.create({ shop_id, supplier_id, product_id, quantity, unit_price }, (err, data) => {
+    Contract.create({ quote_id: quote_id || 0, shop_id, supplier_id, product_id, quantity, unit_price, delivery_days }, (err, data) => {
         if (err) return res.status(500).json({ error: "Error creating contract" });
         res.status(201).json(data);
     });
