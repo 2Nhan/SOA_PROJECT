@@ -260,10 +260,9 @@ cd ~/environment/SOA_PROJECT
 docker run -d \
   --name mysql-test \
   -e MYSQL_ROOT_PASSWORD=rootpass \
-  -e MYSQL_USER=root \
-  -e MYSQL_PASSWORD=rootpass \
   -p 3306:3306 \
-  mysql:8.0
+  mysql:8.0 \
+  --default-authentication-plugin=mysql_native_password
 
 # Wait for MySQL to be ready (~15 seconds)
 sleep 15
