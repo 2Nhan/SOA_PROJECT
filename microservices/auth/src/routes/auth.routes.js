@@ -16,8 +16,8 @@ router.post("/api/auth/users/:id/reject", requireApiKey, authController.rejectUs
 router.post("/api/auth/users/:id/delete", requireApiKey, authController.deleteUserApi);
 router.post("/api/auth/users/:id/update-profile", requireApiKey, authController.updateProfileApi);
 router.post("/api/auth/users/:id/change-password", requireApiKey, authController.changePasswordApi);
-router.post("/api/auth/login", requireApiKey, authController.loginApi);
-router.post("/api/auth/register", requireApiKey, authController.registerApi);
+router.post("/api/auth/login", authController.loginApi);
+router.post("/api/auth/register", authController.registerApi);
 
 // --------------- WEB UI ROUTES ---------------
 router.get("/login", authController.loginForm);

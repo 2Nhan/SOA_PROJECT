@@ -70,7 +70,7 @@ function httpPost(url, body, timeoutMs) {
         const options = {
             hostname: urlObj.hostname,
             port: urlObj.port,
-            path: urlObj.pathname,
+            path: urlObj.pathname + urlObj.search,
             method: "POST",
             timeout: timeoutMs,
             headers: getInternalHeaders({

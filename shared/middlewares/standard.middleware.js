@@ -29,8 +29,11 @@ exports.applyStandardMiddlewares = (app) => {
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
     app.use(cors({
         origin: (origin, callback) => {
+            // No Origin header (same-origin, server-to-server, curl) → allow
             if (!origin) return callback(null, true);
-            if (!allowedOrigins.length) return callback(null, false);
+            // No ALLOWED_ORIGINS configured → allow all (permissive default)
+            if (!allowedOrigins.length) return callback(null, true);
+            // Check against whitelist
             return callback(null, allowedOrigins.includes(origin));
         },
         methods: ["GET", "POST"],
