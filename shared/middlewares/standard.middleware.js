@@ -9,28 +9,21 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 
 exports.applyStandardMiddlewares = (app) => {
-    // Helmet with CSP enabled (Fix #12)
     app.use(helmet({
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"],
-                styleSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
+                scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+                fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
                 imgSrc: ["'self'", "data:", "https:", "*.unsplash.com", "*.amazonaws.com"],
-                fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"],
                 connectSrc: ["'self'"],
-                frameSrc: ["'none'"],
-                objectSrc: ["'none'"],
-                // Disable upgrade-insecure-requests so browsers don't force HTTPS
-                // (ALB serves HTTP only; without this the browser upgrades to HTTPS → timeout)
-                upgradeInsecureRequests: []
             }
         },
         // Allow Cloud9 Preview and ALB health checks to embed in iframe
         frameguard: false
     }));
 
-    // CORS with restricted origins (Fix #11)
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
     app.use(cors({
         origin: (origin, callback) => {
@@ -61,19 +54,4 @@ exports.applyStandardMiddlewares = (app) => {
     app.use(express.json({ limit: "1mb" }));
 
     app.set("trust proxy", 1);
-};
-
-/**
- * Sanitize input string — stronger XSS prevention (Fix #9)
- * Removes HTML tags, event handlers, javascript: URIs, and encoded payloads
- */
-exports.sanitizeInput = (str) => {
-    if (typeof str !== "string") return str;
-    return str
-        .replace(/<[^>]*>?/g, "")           // Remove HTML tags (including incomplete)
-        .replace(/javascript\s*:/gi, "")     // Remove javascript: URIs
-        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, "") // Remove event handlers like onclick="..."
-        .replace(/on\w+\s*=\s*[^\s>]*/gi, "")        // Remove event handlers without quotes
-        .replace(/&#?[a-z0-9]+;/gi, "")     // Remove HTML entities
-        .trim();
 };
