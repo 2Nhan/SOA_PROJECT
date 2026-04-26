@@ -23,7 +23,7 @@
                 },
                 {
                     "name": "APP_DB_PASSWORD",
-                    "value": "lab-password"
+                    "value": "<DB-PASSWORD>"
                 },
                 {
                     "name": "APP_DB_NAME",
@@ -40,6 +40,22 @@
                 {
                     "name": "SUPPLIER_SERVICE_URL",
                     "value": "http://<ALB-DNS-NAME>"
+                },
+                {
+                    "name": "SESSION_SECRET",
+                    "value": "<SESSION-SECRET>"
+                },
+                {
+                    "name": "NODE_ENV",
+                    "value": "production"
+                },
+                {
+                    "name": "SESSION_COOKIE_SECURE",
+                    "value": "false"
+                },
+                {
+                    "name": "INTERNAL_API_KEY",
+                    "value": "<INTERNAL-API-KEY>"
                 }
             ],
             "essential": true,

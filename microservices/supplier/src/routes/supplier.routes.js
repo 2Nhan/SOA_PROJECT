@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireAdmin } = require("../../../../shared/middlewares/auth.middleware");
+const { requireAuth, requireAdmin, requireSupplier, requireSupplierOrAdmin } = require("../../../../shared/middlewares/auth.middleware");
+const { requireApiKey } = require("../../../../shared/middlewares/apikey.middleware");
 const rateLimit = require("express-rate-limit");
 
 const writeLimiter = rateLimit({
@@ -22,19 +23,22 @@ const productApiController = require("../api/product.api");
 const quoteApiController = require("../api/quote.api");
 const contractApiController = require("../api/contract.api");
 
-// --------------- INTERNAL API ROUTES ---------------
-router.get("/api/supplier/products", productApiController.findByIds);
-router.get("/api/supplier/products/active", productApiController.findAllActive);
-router.get("/api/supplier/products/search", productApiController.search);
-router.get("/api/supplier/products/:id", productApiController.findOne);
-router.post("/api/supplier/products/:id/check-stock", productApiController.checkStock);
-router.post("/api/supplier/products/:id/reduce-stock", productApiController.reduceStock);
-router.post("/api/supplier/products/:id/restore-stock", productApiController.restoreStock);
-router.get("/api/supplier/quotes", quoteApiController.findByRfqIds);
-router.get("/api/supplier/quotes/:id", quoteApiController.findOne);
-router.get("/api/supplier/contracts", contractApiController.findByIds);
-router.get("/api/supplier/contracts/:id", contractApiController.findOne);
-router.get("/api/supplier/contracts/count", contractApiController.count);
+// --------------- INTERNAL API ROUTES (protected by API key) ---------------
+router.get("/api/supplier/products", requireApiKey, productApiController.findByIds);
+router.get("/api/supplier/products/active", requireApiKey, productApiController.findAllActive);
+router.get("/api/supplier/products/search", requireApiKey, productApiController.search);
+router.get("/api/supplier/products/:id", requireApiKey, productApiController.findOne);
+router.post("/api/supplier/products/:id/check-stock", requireApiKey, productApiController.checkStock);
+router.post("/api/supplier/products/:id/reduce-stock", requireApiKey, productApiController.reduceStock);
+router.post("/api/supplier/products/:id/restore-stock", requireApiKey, productApiController.restoreStock);
+router.get("/api/supplier/quotes", requireApiKey, quoteApiController.findByRfqIds);
+router.get("/api/supplier/quotes/:id", requireApiKey, quoteApiController.findOne);
+router.post("/api/supplier/quotes/:id/status", requireApiKey, quoteApiController.updateStatus);
+router.get("/api/supplier/contracts", requireApiKey, contractApiController.findByIds);
+router.get("/api/supplier/contracts/by-shop", requireApiKey, contractApiController.findByShopId);
+router.get("/api/supplier/contracts/count", requireApiKey, contractApiController.count);
+router.get("/api/supplier/contracts/:id", requireApiKey, contractApiController.findOne);
+router.post("/api/supplier/contracts", requireApiKey, contractApiController.create);
 
 // Root redirect
 router.get("/", (req, res) => res.redirect("/admin/"));
@@ -47,40 +51,46 @@ router.post("/admin/register", authController.register);
 router.get("/admin/logout", authController.logout);
 
 // Profile (authenticated)
-router.get("/admin/profile", requireAuth, authController.profile);
-router.post("/admin/profile", requireAuth, authController.updateProfile);
-router.post("/admin/profile/password", requireAuth, authController.changePassword);
+router.get("/admin/profile", requireSupplierOrAdmin, authController.profile);
+router.post("/admin/profile", requireSupplierOrAdmin, authController.updateProfile);
+router.post("/admin/profile/password", requireSupplierOrAdmin, authController.changePassword);
 
 // Supplier Dashboard
-router.get("/admin/", requireAuth, (req, res) => res.render("dashboard"));
+router.get("/admin/", requireAuth, (req, res) => {
+    if (req.session.user.role === "admin") return res.redirect("/admin/manage");
+    if (req.session.user.role !== "supplier") {
+        return res.status(403).render("error", { message: "Access denied. Supplier account required." });
+    }
+    res.render("dashboard");
+});
 
 // Supplier - Products CRUD
-router.get("/admin/products", requireAuth, productController.findAll);
-router.get("/admin/shop-preview", requireAuth, productController.shopPreview);
-router.get("/admin/products/add", requireAuth, productController.createForm);
-router.post("/admin/products", requireAuth, productController.create);
-router.get("/admin/products/edit/:id", requireAuth, productController.editForm);
-router.post("/admin/products/update/:id", requireAuth, productController.update);
-router.post("/admin/products/delete/:id", requireAuth, writeLimiter, productController.remove);
+router.get("/admin/products", requireSupplier, productController.findAll);
+router.get("/admin/shop-preview", requireSupplier, productController.shopPreview);
+router.get("/admin/products/add", requireSupplier, productController.createForm);
+router.post("/admin/products", requireSupplier, productController.create);
+router.get("/admin/products/edit/:id", requireSupplier, productController.editForm);
+router.post("/admin/products/update/:id", requireSupplier, productController.update);
+router.post("/admin/products/delete/:id", requireSupplier, writeLimiter, productController.remove);
 
 // Supplier - RFQs
-router.get("/admin/rfqs", requireAuth, rfqController.findAll);
-router.get("/admin/rfqs/:id", requireAuth, rfqController.findOne);
-router.post("/admin/rfqs/:id/quote", requireAuth, writeLimiter, rfqController.submitQuote);
+router.get("/admin/rfqs", requireSupplier, rfqController.findAll);
+router.get("/admin/rfqs/:id", requireSupplier, rfqController.findOne);
+router.post("/admin/rfqs/:id/quote", requireSupplier, writeLimiter, rfqController.submitQuote);
 
 // Supplier - Contracts
-router.get("/admin/contracts", requireAuth, contractController.findAll);
-router.get("/admin/contracts/:id", requireAuth, contractController.findOne);
-router.post("/admin/contracts/:id/confirm", requireAuth, writeLimiter, contractController.confirm);
-router.post("/admin/contracts/:id/cancel", requireAuth, writeLimiter, contractController.cancel);
+router.get("/admin/contracts", requireSupplier, contractController.findAll);
+router.get("/admin/contracts/:id", requireSupplier, contractController.findOne);
+router.post("/admin/contracts/:id/confirm", requireSupplier, writeLimiter, contractController.confirm);
+router.post("/admin/contracts/:id/cancel", requireSupplier, writeLimiter, contractController.cancel);
 
 // Supplier - Orders & Payments
-router.get("/admin/orders", requireAuth, orderController.findAll);
-router.get("/admin/orders/:id", requireAuth, orderController.findOne);
-router.post("/admin/orders/:id/confirm", requireAuth, writeLimiter, orderController.confirm);
-router.post("/admin/orders/:id/cancel", requireAuth, writeLimiter, orderController.cancel);
-router.get("/admin/orders/:id/payment", requireAuth, paymentController.processForm);
-router.post("/admin/orders/:id/payment", requireAuth, writeLimiter, paymentController.process);
+router.get("/admin/orders", requireSupplier, orderController.findAll);
+router.get("/admin/orders/:id", requireSupplier, orderController.findOne);
+router.post("/admin/orders/:id/confirm", requireSupplier, writeLimiter, orderController.confirm);
+router.post("/admin/orders/:id/cancel", requireSupplier, writeLimiter, orderController.cancel);
+router.get("/admin/orders/:id/payment", requireSupplier, paymentController.processForm);
+router.post("/admin/orders/:id/payment", requireSupplier, writeLimiter, paymentController.process);
 
 // ---- ADMIN MANAGEMENT ROUTES ----
 router.get("/admin/manage", requireAdmin, adminController.dashboard);

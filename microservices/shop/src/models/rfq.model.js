@@ -69,16 +69,18 @@ RFQ.updateStatus = (id, status, result) => {
 
 // Shop accepts a quote -> update rfq status (contract creation via Supplier API)
 RFQ.acceptQuote = (rfqId, result) => {
-  pool.query("UPDATE rfqs SET status = 'accepted' WHERE id = ?", [rfqId], (err) => {
+  pool.query("UPDATE rfqs SET status = 'accepted' WHERE id = ? AND status = 'quoted'", [rfqId], (err, res) => {
     if (err) { result(err, null); return; }
+    if (res.affectedRows == 0) { result({ kind: "not_found_or_invalid" }, null); return; }
     result(null, { id: rfqId, status: "accepted" });
   });
 };
 
 // Shop rejects a quote
 RFQ.rejectQuote = (rfqId, result) => {
-  pool.query("UPDATE rfqs SET status = 'rejected' WHERE id = ?", [rfqId], (err) => {
+  pool.query("UPDATE rfqs SET status = 'rejected' WHERE id = ? AND status = 'quoted'", [rfqId], (err, res) => {
     if (err) { result(err, null); return; }
+    if (res.affectedRows == 0) { result({ kind: "not_found_or_invalid" }, null); return; }
     result(null, { id: rfqId, status: "rejected" });
   });
 };

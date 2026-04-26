@@ -5,15 +5,28 @@ exports.findAll = async (req, res) => {
   try {
     const shopId = req.session.user.id;
 
-    // Contracts are in supplier_db — fetch via Supplier API
-    // We use the contracts API to get contracts for this shop
-    // For now, using a workaround: shop queries its own contracts via product relationship
-    const contractsData = await supplierService.getContractsByIds([]);
+    // Fetch contracts for this shop from Supplier service
+    const contracts = await supplierService.getContractsByShopId(shopId);
 
-    // Since we can't easily query contracts by shop_id from the API,
-    // we'll use the provided contracts endpoint which returns all contracts
-    // TODO: Add /api/contracts?shop_id=X endpoint to Supplier service
-    res.render("contract-list", { contracts: [] });
+    // Collect unique IDs for enrichment
+    const productIds = [...new Set(contracts.map(c => c.product_id).filter(Boolean))];
+    const supplierIds = [...new Set(contracts.map(c => c.supplier_id).filter(Boolean))];
+
+    // Parallel batch fetch
+    const [productMap, userMap] = await Promise.all([
+      supplierService.getProductsByIds(productIds, ["id", "name", "image_url"]),
+      authService.getUsersByIds(supplierIds, ["id", "full_name"])
+    ]);
+
+    // Enrich contracts with product and supplier names
+    const enriched = contracts.map(c => ({
+      ...c,
+      product_name: productMap[c.product_id]?.name || "Unknown Product",
+      image_url: productMap[c.product_id]?.image_url || "",
+      supplier_name: userMap[c.supplier_id]?.full_name || "Unknown Supplier"
+    }));
+
+    res.render("contract-list", { contracts: enriched });
   } catch (err) {
     console.error("[Contract.findAll Error]", err.message);
     res.status(500).render("error", { message: "Error retrieving contracts" });
@@ -29,6 +42,9 @@ exports.findOne = async (req, res) => {
     const contracts = await supplierService.getContractsByIds([id]);
     const contract = contracts[id];
     if (!contract) return res.status(404).render("error", { message: "Contract not found" });
+    if (contract.shop_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only view your own contracts" });
+    }
 
     // Fetch product + user names
     const [product, userMap] = await Promise.all([
@@ -64,6 +80,9 @@ exports.createOrder = async (req, res) => {
     const contracts = await supplierService.getContractsByIds([contractId]);
     const contract = contracts[contractId];
     if (!contract) return res.status(404).render("error", { message: "Contract not found" });
+    if (contract.shop_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only create orders for your own contracts" });
+    }
     if (contract.status !== "confirmed") {
       return res.render("error", { message: "Contract must be confirmed by supplier first" });
     }
@@ -82,7 +101,7 @@ exports.createOrder = async (req, res) => {
     const Order = require("../models/order.model");
     await new Promise((resolve, reject) => {
       Order.create({
-        shop_id: contract.shop_id,
+        shop_id: req.session.user.id,
         product_id: contract.product_id,
         quantity: contract.quantity,
         total_price: contract.total_amount,

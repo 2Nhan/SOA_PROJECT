@@ -55,11 +55,22 @@ exports.findOneRfq = (req, res) => {
 exports.updateRfqStatus = (req, res) => {
     const id = parseInt(req.params.id);
     const status = req.body.status;
-    if (isNaN(id) || !status) return res.status(400).json({ error: "Invalid ID or status" });
+    const allowed = ["pending", "quoted", "accepted", "rejected", "expired"];
+    if (isNaN(id) || !allowed.includes(status)) return res.status(400).json({ error: "Invalid ID or status" });
 
-    RFQ.updateStatus(id, status, (err, data) => {
-        if (err) return res.status(500).json({ error: "Error updating RFQ status" });
-        res.json(data);
+    RFQ.findById(id, (err, rfq) => {
+        if (err) {
+            if (err.kind === "not_found") return res.status(404).json({ error: "RFQ not found" });
+            return res.status(500).json({ error: "Error retrieving RFQ" });
+        }
+        if (!isAllowedTransition(RFQ_TRANSITIONS, rfq.status, status)) {
+            return res.status(409).json({ error: `Invalid RFQ status transition: ${rfq.status} -> ${status}` });
+        }
+
+        RFQ.updateStatus(id, status, (err, data) => {
+            if (err) return res.status(500).json({ error: "Error updating RFQ status" });
+            res.json(data);
+        });
     });
 };
 
@@ -91,11 +102,22 @@ exports.findOneOrder = (req, res) => {
 exports.updateOrderStatus = (req, res) => {
     const id = parseInt(req.params.id);
     const status = req.body.status;
-    if (isNaN(id) || !status) return res.status(400).json({ error: "Invalid ID or status" });
+    const allowed = ["pending", "confirmed", "paid", "delivering", "delivered", "cancelled"];
+    if (isNaN(id) || !allowed.includes(status)) return res.status(400).json({ error: "Invalid ID or status" });
 
-    Order.updateStatus(id, status, (err, data) => {
-        if (err) return res.status(500).json({ error: "Error updating order status" });
-        res.json(data);
+    Order.findById(id, (err, order) => {
+        if (err) {
+            if (err.kind === "not_found") return res.status(404).json({ error: "Order not found" });
+            return res.status(500).json({ error: "Error retrieving order" });
+        }
+        if (!isAllowedTransition(ORDER_TRANSITIONS, order.status, status)) {
+            return res.status(409).json({ error: `Invalid order status transition: ${order.status} -> ${status}` });
+        }
+
+        Order.updateStatus(id, status, (err, data) => {
+            if (err) return res.status(500).json({ error: "Error updating order status" });
+            res.json(data);
+        });
     });
 };
 
@@ -112,3 +134,24 @@ exports.stats = (req, res) => {
         });
     });
 };
+
+const RFQ_TRANSITIONS = {
+    pending: ["quoted", "rejected", "expired"],
+    quoted: ["accepted", "rejected", "expired"],
+    accepted: [],
+    rejected: [],
+    expired: []
+};
+
+const ORDER_TRANSITIONS = {
+    pending: ["confirmed", "cancelled"],
+    confirmed: ["paid", "cancelled"],
+    paid: ["delivering", "delivered"],
+    delivering: ["delivered"],
+    delivered: [],
+    cancelled: []
+};
+
+function isAllowedTransition(transitions, current, next) {
+    return current === next || (transitions[current] || []).includes(next);
+}

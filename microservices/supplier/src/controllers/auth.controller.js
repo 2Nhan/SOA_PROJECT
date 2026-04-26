@@ -20,7 +20,7 @@ exports.login = async (req, res) => {
       return res.render("login", { error: "Access denied. Supplier or Admin account required." });
     }
     req.session.user = user;
-    res.redirect("/admin/");
+    res.redirect(user.role === "admin" ? "/admin/manage" : "/admin/");
   } catch (err) {
     const msg = err.message || "";
     if (msg.includes("Email not found")) return res.render("login", { error: "Email not found" });
@@ -83,26 +83,50 @@ exports.updateProfile = async (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase().replace(/<[^>]*>/g, "");
 
   if (!full_name || !email) {
-    const user = await authService.getUserById(req.session.user.id);
-    return res.render("profile", { user: user || req.session.user, success: null, error: "Name and email are required" });
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    return res.render("profile", { user, success: null, error: "Name and email are required" });
   }
 
-  // Profile update still goes through Auth service's REST API
-  // For now, keep using session user data since no direct profile update API
-  // The profile page is handled by Auth service directly
   try {
-    const user = await authService.getUserById(req.session.user.id);
-    res.render("profile", { user: user || req.session.user, success: null, error: "Please update your profile via the Auth service." });
+    await authService.updateUserProfile(req.session.user.id, { full_name, email });
+    req.session.user.full_name = full_name;
+    req.session.user.email = email;
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    res.render("profile", { user, success: "Profile updated successfully", error: null });
   } catch (err) {
-    res.status(500).render("error", { message: "Error updating profile" });
+    const msg = err.message || "";
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    if (msg.includes("already in use")) return res.render("profile", { user, success: null, error: "Email already in use" });
+    res.render("profile", { user, success: null, error: "Error updating profile" });
   }
 };
 
 exports.changePassword = async (req, res) => {
+  const old_password = req.body.old_password || "";
+  const new_password = req.body.new_password || "";
+  const confirm_password = req.body.confirm_password || "";
+
+  if (!old_password || !new_password) {
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    return res.render("profile", { user, success: null, error: "All password fields are required" });
+  }
+  if (new_password.length < 6) {
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    return res.render("profile", { user, success: null, error: "New password must be at least 6 characters" });
+  }
+  if (new_password !== confirm_password) {
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    return res.render("profile", { user, success: null, error: "New passwords do not match" });
+  }
+
   try {
-    const user = await authService.getUserById(req.session.user.id);
-    res.render("profile", { user: user || req.session.user, success: null, error: "Please change your password via the Auth service." });
+    await authService.changeUserPassword(req.session.user.id, { old_password, new_password });
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    res.render("profile", { user, success: "Password changed successfully", error: null });
   } catch (err) {
-    res.status(500).render("error", { message: "Error changing password" });
+    const msg = err.message || "";
+    const user = await authService.getUserById(req.session.user.id).catch(() => req.session.user);
+    if (msg.includes("incorrect")) return res.render("profile", { user, success: null, error: "Current password is incorrect" });
+    res.render("profile", { user, success: null, error: "Error changing password" });
   }
 };

@@ -48,6 +48,9 @@ exports.findOne = async (req, res) => {
     // Fetch RFQ from Shop service
     const rfq = await shopService.getRfqById(id);
     if (!rfq) return res.status(404).render("error", { message: "RFQ not found" });
+    if (rfq.supplier_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "You can only view RFQs sent to your supplier account" });
+    }
 
     // Fetch quote locally
     const quote = await new Promise((resolve, reject) => {
@@ -104,8 +107,24 @@ exports.submitQuote = async (req, res) => {
 
     const note = (req.body.note || "").replace(/<[^>]*>/g, "").substring(0, 500);
 
+    const rfq = await shopService.getRfqById(rfqId);
+    if (!rfq) return res.status(404).render("error", { message: "RFQ not found" });
+    if (rfq.supplier_id !== supplierId) {
+      return res.status(403).render("error", { message: "You can only quote RFQs sent to your supplier account" });
+    }
+    if (rfq.status !== "pending") {
+      return res.status(400).render("error", { message: "Only pending RFQs can be quoted" });
+    }
+
+    const existingQuote = await new Promise((resolve, reject) => {
+      RFQ.getQuoteByRfqId(rfqId, (err, data) => err ? reject(err) : resolve(data));
+    });
+    if (existingQuote) {
+      return res.status(400).render("error", { message: "This RFQ already has a quote" });
+    }
+
     // Insert quote locally
-    await new Promise((resolve, reject) => {
+    const quote = await new Promise((resolve, reject) => {
       RFQ.submitQuote(rfqId, { supplier_id: supplierId, unit_price: unitPrice, moq, delivery_days: deliveryDays, note }, (err, data) => {
         if (err) return reject(err);
         resolve(data);
@@ -116,7 +135,9 @@ exports.submitQuote = async (req, res) => {
     try {
       await shopService.updateRfqStatus(rfqId, "quoted");
     } catch (err) {
-      console.warn("[RFQ.submitQuote] Failed to update RFQ status in Shop:", err.message);
+      await safelyDeleteQuote(quote.id);
+      console.error("[RFQ.submitQuote] Failed to update RFQ status in Shop:", err.message);
+      return res.status(502).render("error", { message: "Quote could not be submitted because RFQ status was not updated" });
     }
 
     res.redirect("/admin/rfqs/" + rfqId);
@@ -125,3 +146,17 @@ exports.submitQuote = async (req, res) => {
     res.status(500).render("error", { message: "Error submitting quote" });
   }
 };
+
+function deleteQuoteById(id) {
+  return new Promise((resolve, reject) => {
+    RFQ.deleteQuoteById(id, (err, data) => err ? reject(err) : resolve(data));
+  });
+}
+
+async function safelyDeleteQuote(id) {
+  try {
+    await deleteQuoteById(id);
+  } catch (err) {
+    console.error(`[RFQ.submitQuote] Failed to remove local quote ${id}:`, err.message);
+  }
+}

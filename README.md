@@ -108,7 +108,7 @@ Handles all user management, authentication, and session handling. Provides a ce
 |---|---|
 | Registration & Login | Unified UI for users to sign up and authenticate |
 | Profile Management | Update name, email, change password |
-| Inter-service API | Provides batch lookup (`/api/users?ids=X,Y`) for API composition |
+| Inter-service API | Provides batch lookup (`/api/auth/users?ids=X,Y`) for API composition |
 | Session Management | Centralized cookie-based session tracking |
 
 ### Shop Service (Buyer)
@@ -137,7 +137,7 @@ Handles seller operations and system administration. Suppliers manage inventory,
 | **Admin: Product approval** | Approve/reject product listings before they go live |
 | **Admin: System monitoring** | Dashboard with stats, view all RFQs and contracts |
 
-Both services are stateless and connect to a shared MySQL database. Each service runs independently in its own container and can be scaled, updated, or restarted without affecting the other.
+All services are stateless at the container layer and share only the external MySQL instance/session store. Each service owns its schema and can be scaled, updated, or restarted independently.
 
 ---
 
@@ -160,12 +160,12 @@ Step 2: SUBMIT QUOTE (Supplier Service)
   v
 Step 3: ACCEPT/REJECT QUOTE (Shop Service)
   |  Shop reviews quote and accepts or rejects
-  |  [Accept] --> BEGIN TRANSACTION
-  |                Update quote status: accepted
-  |                Update RFQ status: accepted
+  |  [Accept] --> Supplier transaction:
+  |                Validate quote is pending
   |                Create contract record
-  |              COMMIT
-  |  [Reject] --> Update quote status: rejected
+  |                Update quote status: accepted
+  |              Then update RFQ status: accepted in Shop
+  |  [Reject] --> Update quote status: rejected, then RFQ status: rejected
   v
 Step 4: CONFIRM CONTRACT (Supplier Service)
   |  Supplier confirms the contract
@@ -175,13 +175,11 @@ Step 4: CONFIRM CONTRACT (Supplier Service)
   v
 Step 5: CREATE ORDER FROM CONTRACT (Shop Service)
   |  Shop creates order linked to the contract
-  |  BEGIN TRANSACTION
-  |    Validate stock availability
-  |    Insert order record (status: pending)
-  |    Deduct stock from product
-  |  COMMIT
+  |  Saga:
+  |    Validate and deduct stock in Supplier
+  |    Insert order record in Shop (status: pending)
   |
-  |  [Failure] --> Rollback: no order created, stock unchanged
+  |  [Order insert failure] --> Compensating action: restore stock
   v
 Step 6: CONFIRM ORDER (Supplier Service)
   |  Supplier reviews and confirms the order
@@ -192,12 +190,11 @@ Step 6: CONFIRM ORDER (Supplier Service)
   v
 Step 7: PROCESS PAYMENT (Supplier Service)
   |  Validate payment method (bank_transfer, qr_code, cod)
-  |  BEGIN TRANSACTION
-  |    Insert payment record (status: success)
-  |    Update order status: confirmed --> paid
-  |  COMMIT
+  |  Insert payment record (status: pending)
+  |  Update order status: confirmed --> paid
+  |  Mark payment status: success
   |
-  |  [Payment Failure] --> Compensating: cancel order + restore stock
+  |  [Payment finalize failure] --> Mark payment failed; order status is not changed
   v
 Step 8: ORDER COMPLETE
   Final state: order.status = 'paid', payment recorded
@@ -211,7 +208,7 @@ Step 8: ORDER COMPLETE
 | Product not found | Product deleted or inactive | Order rejected with error message |
 | Order cancelled (pending) | Supplier cancels pending order | Stock restored to original level |
 | Order cancelled (confirmed) | Supplier cancels confirmed order | Stock restored to original level |
-| Payment failure | Database error during payment | Order cancelled + stock restored |
+| Payment finalize failure | Shop status update or local payment update fails | Payment marked failed; order remains unchanged for retry |
 | Invalid payment method | Method not in whitelist | Request rejected with validation error |
 
 ---
@@ -332,7 +329,7 @@ The application implements multiple layers of security:
 | Layer | Implementation | Description |
 |---|---|---|
 | Authentication | `bcryptjs` + `express-session` | Password hashing (10 salt rounds), session-based login, role-based access control |
-| Auth Middleware | `requireAuth`, `requireAdmin` | All routes protected; unauthenticated users redirected to service-specific login (`/login` for Shop, `/admin/login` for Supplier); admin routes require admin role |
+| Auth Middleware | `requireAuth`, `requireShop`, `requireSupplier`, `requireAdmin` | Web routes are role-protected; unauthenticated users redirect to service-specific login (`/login` for Shop, `/admin/login` for Supplier); admin routes require admin role |
 | HTTP Headers | `helmet` | Sets security headers: X-XSS-Protection, X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options |
 | CORS | `cors` | Configurable origin restriction via `ALLOWED_ORIGINS` env var |
 | Rate Limiting | `express-rate-limit` | Global: 200 req/15min per IP. Write operations: 10-20 req/min per IP |
@@ -372,6 +369,16 @@ products       -- Product catalog (requires admin approval)
   status       ENUM('active', 'inactive', 'pending') DEFAULT 'pending'
   image_url    VARCHAR(500)
   category     VARCHAR(100)
+
+quotes         -- Supplier responses to RFQs
+  id           INT PRIMARY KEY AUTO_INCREMENT
+  rfq_id       INT logical reference -> shop_db.rfqs.id
+  supplier_id  INT logical reference -> auth_db.users.id
+  unit_price   DECIMAL(12,2)
+  moq          INT                   -- Minimum order quantity
+  delivery_days INT
+  note         TEXT
+  status       ENUM('pending', 'accepted', 'rejected')
 ```
 
 **3. `shop_db` (Procurement Service)**
@@ -384,16 +391,6 @@ rfqs           -- Request for Quotation from shops
   quantity     INT
   note         TEXT
   status       ENUM('pending', 'quoted', 'accepted', 'rejected', 'expired')
-
-quotes         -- Supplier responses to RFQs
-  id           INT PRIMARY KEY AUTO_INCREMENT
-  rfq_id       INT FOREIGN KEY -> rfqs.id
-  supplier_id  INT FOREIGN KEY -> users.id
-  unit_price   DECIMAL(12,2)
-  moq          INT                   -- Minimum order quantity
-  delivery_days INT
-  note         TEXT
-  status       ENUM('pending', 'accepted', 'rejected')
 ```
 
 **Back inside `supplier_db`**:
@@ -401,8 +398,8 @@ quotes         -- Supplier responses to RFQs
 contracts      -- Agreements formed from accepted quotes
   id           INT PRIMARY KEY AUTO_INCREMENT
   quote_id     INT FOREIGN KEY -> quotes.id
-  shop_id      INT FOREIGN KEY -> users.id
-  supplier_id  INT FOREIGN KEY -> users.id
+  shop_id      INT logical reference -> auth_db.users.id
+  supplier_id  INT logical reference -> auth_db.users.id
   product_id   INT FOREIGN KEY -> products.id
   quantity     INT
   unit_price   DECIMAL(12,2)
@@ -416,9 +413,9 @@ contracts      -- Agreements formed from accepted quotes
 ```sql
 orders         -- Purchase orders (linked to contracts)
   id           INT PRIMARY KEY AUTO_INCREMENT
-  shop_id      INT FOREIGN KEY -> users.id
-  product_id   INT FOREIGN KEY -> products.id
-  contract_id  INT FOREIGN KEY -> contracts.id (nullable)
+  shop_id      INT logical reference -> auth_db.users.id
+  product_id   INT logical reference -> supplier_db.products.id
+  contract_id  INT logical reference -> supplier_db.contracts.id (nullable)
   quantity     INT
   total_price  DECIMAL(12,2)
   status       ENUM('pending', 'confirmed', 'paid', 'cancelled', 'delivering', 'delivered')
@@ -430,7 +427,7 @@ orders         -- Purchase orders (linked to contracts)
 ```sql
 payments       -- Payment records for confirmed orders
   id           INT PRIMARY KEY AUTO_INCREMENT
-  order_id     INT FOREIGN KEY -> orders.id
+  order_id     INT logical reference -> shop_db.orders.id
   amount       DECIMAL(12,2)
   method       ENUM('bank_transfer', 'qr_code', 'cod')
   status       ENUM('pending', 'success', 'failed')
@@ -527,6 +524,9 @@ payments       -- Payment records for confirmed orders
 ### Running Locally
 
 ```bash
+# Create local secrets first. Change the example values before using a shared machine.
+cp .env.example .env
+
 # Start all services (MySQL + Shop + Supplier)
 docker-compose up --build
 
@@ -534,7 +534,7 @@ docker-compose up --build
 # Supplier panel:  http://localhost:8081/admin/
 ```
 
-The databases are automatically initialized with schema and seed data from `deployment/auth_db_init.sql`, `deployment/supplier_db_init.sql`, and `deployment/shop_db_init.sql`.
+The databases are automatically initialized with `deployment/00-create-user.sh`, `deployment/auth_db_init.sql`, `deployment/supplier_db_init.sql`, and `deployment/shop_db_init.sql`.
 
 ### Demo Credentials
 

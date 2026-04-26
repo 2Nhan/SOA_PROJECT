@@ -10,5 +10,5 @@ COPY shared ./shared
 COPY microservices/supplier ./microservices/supplier
 
 WORKDIR /usr/src/app/microservices/supplier
-EXPOSE 8081
+EXPOSE 8080
 CMD ["node", "index.js"]

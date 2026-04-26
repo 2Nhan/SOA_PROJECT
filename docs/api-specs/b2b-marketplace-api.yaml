@@ -1,18 +1,29 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
   title: B2B Marketplace API
-  description: Internal and public REST APIs for the Auth, Shop, and Supplier microservices.
+  description: Internal REST APIs used for service-to-service communication between Auth, Shop, and Supplier.
   version: 1.0.0
 servers:
   - url: http://localhost:8080
-    description: Shop / Supplier Gateway
+    description: Shop service
+  - url: http://localhost:8081
+    description: Supplier service when run through docker-compose
   - url: http://localhost:8082
-    description: Auth Service
+    description: Auth service
+security:
+  - internalApiKey: []
 paths:
-  /api/users:
+  /health:
     get:
-      summary: Fetch users by IDs (Batch)
-      description: Used by Auth Service to resolve user references without N+1 queries.
+      summary: Service health check
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+
+  /api/auth/users:
+    get:
+      summary: Fetch users by IDs
       parameters:
         - in: query
           name: ids
@@ -20,25 +31,460 @@ paths:
           schema:
             type: string
           example: "1,2,3"
+        - in: query
+          name: fields
+          schema:
+            type: string
+          example: "id,full_name,email"
       responses:
-        '200':
-          description: A JSON array of users
-  /api/products:
+        "200":
+          description: User list
+  /api/auth/users/all:
     get:
-      summary: Fetch products from Supplier Service
+      summary: Fetch all users
       responses:
-        '200':
-          description: Successful
-  /api/rfqs:
+        "200":
+          description: User list
+  /api/auth/users/stats:
     get:
-      summary: Fetch RFQs from Shop Service
+      summary: Fetch user statistics
       responses:
-        '200':
-          description: Successful
-  /api/orders:
+        "200":
+          description: User counts
+  /api/auth/users/{id}:
+    get:
+      summary: Fetch one user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: User detail
+  /api/auth/users/{id}/approve:
     post:
-      summary: Create an order (Saga transaction)
-      description: Initiates an order and reduces stock on Supplier service.
+      summary: Approve a user
+      parameters:
+        - $ref: "#/components/parameters/Id"
       responses:
-        '201':
-          description: Created
+        "200":
+          description: Updated user status
+  /api/auth/users/{id}/reject:
+    post:
+      summary: Reject a user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Updated user status
+  /api/auth/users/{id}/delete:
+    post:
+      summary: Delete a user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Deleted user result
+  /api/auth/users/{id}/update-profile:
+    post:
+      summary: Update user profile
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, email]
+              properties:
+                full_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Updated profile
+  /api/auth/users/{id}/change-password:
+    post:
+      summary: Change user password
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password:
+                  type: string
+                new_password:
+                  type: string
+      responses:
+        "200":
+          description: Password changed
+  /api/auth/login:
+    post:
+      summary: Authenticate through Auth service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Authenticated user
+  /api/auth/register:
+    post:
+      summary: Register through Auth service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, full_name, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                full_name:
+                  type: string
+                role:
+                  type: string
+                  enum: [shop, supplier]
+      responses:
+        "201":
+          description: Registered user
+
+  /api/shop/rfqs:
+    get:
+      summary: Fetch RFQs by supplier ID or IDs
+      parameters:
+        - in: query
+          name: supplier_id
+          schema:
+            type: integer
+        - in: query
+          name: ids
+          schema:
+            type: string
+      responses:
+        "200":
+          description: RFQ list
+  /api/shop/rfqs/all:
+    get:
+      summary: Fetch all RFQs
+      responses:
+        "200":
+          description: RFQ list
+  /api/shop/rfqs/{id}:
+    get:
+      summary: Fetch one RFQ
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: RFQ detail
+  /api/shop/rfqs/{id}/status:
+    post:
+      summary: Update RFQ status using allowed transitions
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/RfqStatus"
+      responses:
+        "200":
+          description: Updated RFQ status
+        "409":
+          description: Invalid status transition
+  /api/shop/orders/all:
+    get:
+      summary: Fetch all orders
+      responses:
+        "200":
+          description: Order list
+  /api/shop/orders/{id}:
+    get:
+      summary: Fetch one order
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Order detail
+  /api/shop/orders/{id}/status:
+    post:
+      summary: Update order status using allowed transitions
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/OrderStatus"
+      responses:
+        "200":
+          description: Updated order status
+        "409":
+          description: Invalid status transition
+  /api/shop/stats:
+    get:
+      summary: Fetch Shop service statistics
+      responses:
+        "200":
+          description: Shop counts
+
+  /api/supplier/products:
+    get:
+      summary: Fetch products by IDs
+      parameters:
+        - in: query
+          name: ids
+          schema:
+            type: string
+        - in: query
+          name: fields
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product list
+  /api/supplier/products/active:
+    get:
+      summary: Fetch active products
+      responses:
+        "200":
+          description: Product list
+  /api/supplier/products/search:
+    get:
+      summary: Search active products
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product list
+  /api/supplier/products/{id}:
+    get:
+      summary: Fetch one active product
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Product detail
+  /api/supplier/products/{id}/check-stock:
+    post:
+      summary: Check stock availability
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/Quantity"
+      responses:
+        "200":
+          description: Stock check result
+  /api/supplier/products/{id}/reduce-stock:
+    post:
+      summary: Reduce stock for order creation
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/Quantity"
+      responses:
+        "200":
+          description: Reduced stock result
+  /api/supplier/products/{id}/restore-stock:
+    post:
+      summary: Restore stock as a compensating action
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/Quantity"
+      responses:
+        "200":
+          description: Restored stock result
+  /api/supplier/quotes:
+    get:
+      summary: Fetch quotes by RFQ IDs
+      parameters:
+        - in: query
+          name: rfq_ids
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quote list
+  /api/supplier/quotes/{id}:
+    get:
+      summary: Fetch one quote
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Quote detail
+  /api/supplier/quotes/{id}/status:
+    post:
+      summary: Reject a pending quote
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [rejected]
+      responses:
+        "200":
+          description: Updated quote status
+        "409":
+          description: Invalid status transition
+  /api/supplier/contracts:
+    get:
+      summary: Fetch contracts by IDs
+      parameters:
+        - in: query
+          name: ids
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contract list
+    post:
+      summary: Create a contract from an accepted quote flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContract"
+      responses:
+        "201":
+          description: Created contract
+        "409":
+          description: Quote already finalized or contract already exists
+  /api/supplier/contracts/by-shop:
+    get:
+      summary: Fetch contracts for a shop
+      parameters:
+        - in: query
+          name: shop_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contract list
+  /api/supplier/contracts/count:
+    get:
+      summary: Count contracts
+      responses:
+        "200":
+          description: Contract count
+  /api/supplier/contracts/{id}:
+    get:
+      summary: Fetch one contract
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Contract detail
+
+components:
+  securitySchemes:
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  requestBodies:
+    Quantity:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [quantity]
+            properties:
+              quantity:
+                type: integer
+                minimum: 1
+    RfqStatus:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [pending, quoted, accepted, rejected, expired]
+    OrderStatus:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [pending, confirmed, paid, delivering, delivered, cancelled]
+  schemas:
+    CreateContract:
+      type: object
+      required:
+        - quote_id
+        - shop_id
+        - supplier_id
+        - product_id
+        - quantity
+        - unit_price
+      properties:
+        quote_id:
+          type: integer
+          minimum: 1
+        shop_id:
+          type: integer
+          minimum: 1
+        supplier_id:
+          type: integer
+          minimum: 1
+        product_id:
+          type: integer
+          minimum: 1
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+          minimum: 0.01
+        total_amount:
+          type: number
+          minimum: 0.01
+        delivery_days:
+          type: integer
+          minimum: 1

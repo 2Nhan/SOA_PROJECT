@@ -6,13 +6,34 @@ const http = require("http");
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8082";
 const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+
+function getInternalHeaders(extraHeaders = {}) {
+    if (!INTERNAL_API_KEY) {
+        throw new Error("INTERNAL_API_KEY is required for inter-service calls");
+    }
+
+    return {
+        ...extraHeaders,
+        "x-api-key": INTERNAL_API_KEY
+    };
+}
 
 /**
  * HTTP GET with timeout — uses native http module (no extra dependencies)
  */
 function httpGet(url, timeoutMs) {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, { timeout: timeoutMs }, (res) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port,
+            path: urlObj.pathname + urlObj.search,
+            method: "GET",
+            timeout: timeoutMs,
+            headers: getInternalHeaders()
+        };
+        const req = http.request(options, (res) => {
             let data = "";
             res.on("data", (chunk) => { data += chunk; });
             res.on("end", () => {
@@ -50,10 +71,10 @@ function httpPost(url, body, timeoutMs) {
             path: urlObj.pathname,
             method: "POST",
             timeout: timeoutMs,
-            headers: {
+            headers: getInternalHeaders({
                 "Content-Type": "application/json",
                 "Content-Length": Buffer.byteLength(postData)
-            }
+            })
         };
         const req = http.request(options, (res) => {
             let data = "";
@@ -175,6 +196,20 @@ async function registerUser(userData) {
 }
 
 /**
+ * Update user profile via Auth API
+ */
+async function updateUserProfile(id, { full_name, email }) {
+    return await httpPost(`${AUTH_SERVICE_URL}/api/auth/users/${id}/update-profile`, { full_name, email }, TIMEOUT_MS);
+}
+
+/**
+ * Change user password via Auth API
+ */
+async function changeUserPassword(id, { old_password, new_password }) {
+    return await httpPost(`${AUTH_SERVICE_URL}/api/auth/users/${id}/change-password`, { old_password, new_password }, TIMEOUT_MS);
+}
+
+/**
  * Fallback user data when Auth service is unavailable
  */
 function getFallbackUser(id) {
@@ -201,6 +236,8 @@ module.exports = {
     deleteUser,
     loginUser,
     registerUser,
+    updateUserProfile,
+    changeUserPassword,
     getFallbackUser,
     withFallback
 };

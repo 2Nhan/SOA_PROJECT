@@ -61,6 +61,7 @@ exports.findOne = async (req, res) => {
     // Fetch product from Supplier service
     const product = await supplierService.getProductById(id);
     if (!product || !product.id) return res.status(404).render("error", { message: "Product not found" });
+    if (product.status !== "active") return res.status(404).render("error", { message: "Product not found" });
 
     // Fetch supplier name from Auth
     const userMap = await authService.getUsersByIds([product.supplier_id], ["id", "full_name"]);
