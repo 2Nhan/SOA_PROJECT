@@ -7,6 +7,15 @@ if [ -z "$SERVICE" ]; then
   exit 1
 fi
 
+case "$SERVICE" in
+  shop|supplier|auth) ;;
+  *)
+    echo "Invalid service: $SERVICE"
+    echo "Usage: ./deploy.sh <shop|supplier|auth>"
+    exit 1
+    ;;
+esac
+
 # Resolve project root relative to this script's location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
@@ -26,9 +35,26 @@ docker push $IMAGE_URI
 
 echo "=== Registering new task definition ==="
 cd "$PROJECT_ROOT/deployment"
-# We register the existing task def directly (AWS fetches the latest image pushed to ECR under the 'latest' tag)
+
+TASKDEF_TEMPLATE="taskdef-$SERVICE.json"
+TASKDEF_RENDERED="/tmp/taskdef-$SERVICE-deploy.json"
+
+cp "$TASKDEF_TEMPLATE" "$TASKDEF_RENDERED"
+sed -i "s|<IMAGE1_NAME>|$IMAGE_URI|g" "$TASKDEF_RENDERED"
+
+if [ -n "${ALB_DNS_NAME:-}" ]; then
+  sed -i "s|http://<ALB-DNS-NAME>|http://$ALB_DNS_NAME|g" "$TASKDEF_RENDERED"
+fi
+
+if grep -Eq '<RDS-ENDPOINT>|<DB-PASSWORD>|<SESSION-SECRET>|<INTERNAL-API-KEY>|<ALB-DNS-NAME>|<ACCOUNT-ID>|<IMAGE1_NAME>' "$TASKDEF_RENDERED"; then
+  echo "ERROR: $TASKDEF_TEMPLATE still contains deployment placeholders."
+  echo "Replace RDS endpoint, DB password, session secret, internal API key, ALB DNS, account ID before deploying."
+  echo "Tip: export ALB_DNS_NAME=<your-alb-dns-name> before running this script to replace <ALB-DNS-NAME> automatically."
+  exit 1
+fi
+
 TASKDEF_ARN=$(aws ecs register-task-definition \
-  --cli-input-json file://taskdef-$SERVICE.json \
+  --cli-input-json file://$TASKDEF_RENDERED \
   --query 'taskDefinition.taskDefinitionArn' --output text)
 echo "New Task Definition: $TASKDEF_ARN"
 

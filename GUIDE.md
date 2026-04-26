@@ -276,6 +276,8 @@ docker exec -i mysql-test mysql -uroot -prootpass < deployment/shop_db_init.sql
 
 ### Task 4.3: Build and test the Shop microservice
 
+> **Important:** Start the Auth microservice before testing any login flow. The Shop and Supplier services render their own login pages, but both authenticate by calling the Auth API. If Auth is not running, the page can load while login still fails.
+
 ```bash
 cd ~/environment/SOA_PROJECT
 
@@ -646,9 +648,9 @@ The final layered network architecture:
 
 > **Security concept (Defense in Depth)**: Each layer only accepts traffic from the layer above it. RDS is never directly accessible from the internet. This follows the **principle of least privilege** — each component has only the minimum access it needs.
 
-### Task 7.2: Create four target groups
+### Task 7.2: Create six target groups
 
-Blue/green deployment with CodeDeploy requires **two target groups per service** (4 total). CodeDeploy shifts ALB traffic from one target group to the other during deployments.
+Blue/green deployment with CodeDeploy requires **two target groups per service** (6 total for auth, shop, and supplier). CodeDeploy shifts ALB traffic from one target group to the other during deployments.
 
 In the **Amazon EC2** console → **Target Groups** → **Create target group**:
 
@@ -687,12 +689,16 @@ For each target group:
 
 ### Task 7.4: Configure ALB listener rules for path-based routing
 
-1. In the **EC2** console → **Load Balancers** → Select `b2b-alb` → **Listeners and rules**
-2. Select the **HTTP:80** listener → **Manage rules** → **Add rule**
-3. **Add condition**: Select **Path** → Enter `/admin/*`
-4. **Add action**: Forward to → Select `supplier-tg-two`
-5. **Priority**: 1
-6. Select **Create**
+> **Important for login:** Create all three listener rules in the final table below, not only `/admin/*`. Shop and Supplier authenticate by calling the Auth service through `/api/auth/login`; if `/api/auth/*` is not routed to `auth-tg-two`, the website can load but login will fail.
+
+Use the final listener-rules table as the source of truth. If the AWS console only lets you add one rule at a time, repeat **Add rule** three times: first for Auth paths, second for Supplier/Admin paths, and third for Shop API paths.
+
+1. In the **EC2** console -> **Load Balancers** -> Select `b2b-alb` -> **Listeners and rules**
+2. Select the **HTTP:80** listener -> **Manage rules**
+3. Add the priority `1` Auth rule from the table below
+4. Add the priority `2` Supplier/Admin rule from the table below
+5. Add the priority `3` Shop API rule from the table below
+6. Confirm the default action forwards to `shop-tg-two`
 
 The final listener rules should be:
 
@@ -702,6 +708,25 @@ The final listener rules should be:
 | 2 | Path is `/api/supplier/*`, `/admin/*` | Forward to `supplier-tg-two` |
 | 3 | Path is `/api/shop/*` | Forward to `shop-tg-two` |
 | Default | All other paths | Forward to `shop-tg-two` |
+
+### Task 7.5: Inject the ALB DNS into task definitions
+
+After the ALB is created, replace `<ALB-DNS-NAME>` in all task definition files. If this placeholder remains, Shop and Supplier cannot reach `/api/auth/login`, so the site can load while login fails.
+
+```bash
+cd ~/environment/SOA_PROJECT/deployment
+
+alb_dns=$(aws elbv2 describe-load-balancers \
+  --names b2b-alb \
+  --query 'LoadBalancers[0].DNSName' \
+  --output text)
+
+sed -i "s|http://<ALB-DNS-NAME>|http://$alb_dns|g" \
+  taskdef-auth.json taskdef-shop.json taskdef-supplier.json
+
+# This should print nothing. If it prints a file, the placeholder still exists.
+grep -R "<ALB-DNS-NAME>" taskdef-*.json
+```
 
 > **Concept (ALB Path-Based Routing)**: A single ALB routes traffic to different microservices based on URL path. This saves cost vs. multiple ALBs and provides a single entry point for the application.
 
@@ -1009,6 +1034,16 @@ Usage:
 ```bash
 ./deploy.sh shop      # Build, push, and deploy shop service
 ./deploy.sh supplier  # Build, push, and deploy supplier service
+./deploy.sh auth      # Build, push, and deploy auth service
+```
+
+The script validates unresolved placeholders before registering the task definition. If `<ALB-DNS-NAME>` still exists, set it once before running the script:
+
+```bash
+export ALB_DNS_NAME=$(aws elbv2 describe-load-balancers \
+  --names b2b-alb \
+  --query 'LoadBalancers[0].DNSName' \
+  --output text)
 ```
 
 ### How the CI/CD Deployment Works
