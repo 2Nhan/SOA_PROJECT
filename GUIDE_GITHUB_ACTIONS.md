@@ -362,21 +362,6 @@ curl -s http://localhost:8082/health   # Auth  → {"status":"ok"}
 curl -s http://localhost:8080/health   # Shop  → {"status":"ok"}
 curl -s http://localhost:8081/health   # Supplier → {"status":"ok"}
 
-# Test API lấy sản phẩm
-curl -s -H "X-Internal-Api-Key: b2b-internal-key-change-in-production" \
-  http://localhost:8081/api/supplier/products/active
-```
-
-Kiểm tra trên browser:
-
-| URL | Mô tả | Tài khoản test |
-|---|---|---|
-| `http://<Cloud9-Public-IP>:8080` | Shop — trang mua hàng | `shop1@b2bmarket.com` / `password123` |
-| `http://<Cloud9-Public-IP>:8081/admin/login` | Supplier — quản lý sản phẩm | `supplier1@b2bmarket.com` / `password123` |
-| `http://<Cloud9-Public-IP>:8082/login` | Auth — đăng nhập trực tiếp | `admin@b2bmarket.com` / `admin123` |
-
-Sau khi đăng nhập Shop, vào tab **Products** phải thấy 6 sản phẩm từ database.
-
 Khi test xong, dọn dẹp:
 ```bash
 # Ctrl+C để dừng docker compose, sau đó:
@@ -439,36 +424,11 @@ Xác nhận: Vào mỗi repository → xác nhận tag `latest` xuất hiện.
 > aws ecs create-cluster --cluster-name b2b-marketplace
 > ```
 
-### Task 5.3: Cấu hình và register Task Definitions
+### Task 5.3: Chuẩn bị Task Definition Templates
 
-```bash
-cd ~/environment/SOA_PROJECT/deployment
+Trong thư mục `deployment/`, bạn sẽ thấy các file `taskdef-*.json` chứa các giá trị placeholder như `<ACCOUNT-ID>`, `<IMAGE1_NAME>`, `<RDS-ENDPOINT>`. 
 
-# Lấy Account ID
-account_id=$(aws sts get-caller-identity --query Account --output text)
-
-# Inject Account ID vào task definitions
-sed -i "s|<ACCOUNT-ID>|$account_id|g" taskdef-auth.json taskdef-shop.json taskdef-supplier.json
-
-# Inject ECR Image URI
-sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/auth:latest|g" taskdef-auth.json
-sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest|g" taskdef-shop.json
-sed -i "s|<IMAGE1_NAME>|$account_id.dkr.ecr.us-east-1.amazonaws.com/supplier:latest|g" taskdef-supplier.json
-
-# Inject S3 bucket name (cho supplier upload images)
-sed -i 's/"name": "S3_BUCKET", "value": ""/"name": "S3_BUCKET", "value": "b2b-marketplace-images"/g' taskdef-supplier.json
-
-# NOTE: <RDS-ENDPOINT> sẽ được thay thế sau khi tạo RDS ở Phase 6!
-```
-
-Register task definitions:
-```bash
-aws ecs register-task-definition --cli-input-json file://taskdef-auth.json
-aws ecs register-task-definition --cli-input-json file://taskdef-shop.json
-aws ecs register-task-definition --cli-input-json file://taskdef-supplier.json
-```
-
-Xác nhận: ECS Console → **Task Definitions** → Xác nhận `auth`, `shop`, `supplier` có revision 1.
+Chúng ta sẽ **không** đăng ký chúng thủ công ở bước này. Toàn bộ việc điền thông tin và đăng ký (register) sẽ được thực hiện tự động bằng script ở **Phase 8**, sau khi bạn đã có đầy đủ các tài nguyên khác (RDS, ALB, Security Groups).
 
 ### Task 5.4: Tạo CloudWatch Log Groups
 
@@ -490,7 +450,7 @@ aws logs create-log-group --log-group-name /ecs/supplier --region us-east-1
    - **Template**: Free tier (hoặc Dev/Test)
    - **DB instance identifier**: `b2bmarket-db`
    - **Master username**: `admin`
-   - **Master password**: `rootpass`
+   - **Master password**: `lab-password`
    - **Instance class**: `db.c6gd.medium` (nhỏ nhất available trên Learner Lab)
    - **Storage**: 20 GB gp3, tắt auto-scaling
    - **Multi-AZ**: **NO** (tiết kiệm chi phí)
@@ -524,29 +484,21 @@ SHOW DATABASES;
 exit
 
 # Load schema và seed data
-mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/auth_db_init.sql
-mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/supplier_db_init.sql
-mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/shop_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/SOA_PROJECT/deployment/auth_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/SOA_PROJECT/deployment/supplier_db_init.sql
+mysql -h <RDS-ENDPOINT> -u admin -plab-password < ~/environment/SOA_PROJECT/deployment/shop_db_init.sql
 ```
 
 Xác nhận:
 ```bash
-mysql -h <RDS-ENDPOINT> -u admin -prootpass auth_db -e "SHOW TABLES;"
+mysql -h <RDS-ENDPOINT> -u admin -plab-password auth_db -e "SHOW TABLES;"
 ```
 
 Phải thấy các bảng: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orders`, `payments`.
 
-### Task 6.4: Update Task Definitions với RDS Endpoint
+### Task 6.4: Lưu lại RDS Endpoint
 
-```bash
-cd ~/environment/SOA_PROJECT/deployment
-
-# Thay <RDS-ENDPOINT> bằng endpoint thực tế
-sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' \
-  taskdef-auth.json taskdef-shop.json taskdef-supplier.json
-```
-
-> ⚠️ Thay `b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com` bằng RDS endpoint thực tế của bạn.
+Sau khi tạo xong, bạn hãy copy **Endpoint** của RDS (ví dụ: `b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com`). Chúng ta sẽ dùng script tự động để điền vào các file cấu hình ở Phase 8.
 
 ---
 
@@ -597,24 +549,23 @@ Kiến trúc mạng 3 lớp:
 
 ### Task 7.2: Tạo 6 Target Groups
 
-Blue/Green deployment cần **2 target groups mỗi service** (6 tổng):
+Blue/Green deployment cần **2 target groups mỗi service** (6 tổng) để luân phiên traffic:
 
-| Target Group Name | Type | Port | Health Check |
-|---|---|---|---|
-| `auth-tg-one` | IP addresses | **8082** | `/health` |
-| `auth-tg-two` | IP addresses | **8082** | `/health` |
-| `shop-tg-one` | IP addresses | **8080** | `/health` |
-| `shop-tg-two` | IP addresses | **8080** | `/health` |
-| `supplier-tg-one` | IP addresses | **8080** | `/health` |
-| `supplier-tg-two` | IP addresses | **8080** | `/health` |
+| Target Group Name | Type | Port | Health Check | Service |
+|---|---|---|---|---|
+| `auth-tg-one` | IP addresses | **8082** | `/health` | Auth |
+| `auth-tg-two` | IP addresses | **8082** | `/health` | Auth |
+| `shop-tg-one` | IP addresses | **8080** | `/health` | Shop |
+| `shop-tg-two` | IP addresses | **8080** | `/health` | Shop |
+| `supplier-tg-one` | IP addresses | **8080** | `/health` | Supplier |
+| `supplier-tg-two` | IP addresses | **8080** | `/health` | Supplier |
 
-Cho mỗi target group:
-1. Target type: **IP addresses**
-2. Protocol: **HTTP**
-3. ⚠️ **QUAN TRỌNG**: Auth dùng port **8082**, Shop/Supplier dùng port **8080**
-4. VPC: cùng VPC đang dùng
-5. Health check path: `/health`
-6. **Không** đăng ký target nào (ECS sẽ tự đăng ký)
+**Các lưu ý quan trọng khi tạo:**
+1. Target type: **IP addresses**.
+2. Protocol: **HTTP**.
+3. VPC: Cùng VPC đang dùng cho ECS/ALB.
+4. Health check path: **/health**.
+5. **Dòng thời gian**: Luôn để Target Group rỗng (ECS sẽ tự đăng ký Container vào khi service start).
 
 ### Task 7.3: Tạo Application Load Balancer
 
@@ -622,71 +573,107 @@ Cho mỗi target group:
 2. Cấu hình:
    - **Name**: `b2b-alb`
    - **Scheme**: **Internet-facing**
-   - **IP address type**: IPv4
-   - **VPC**: cùng VPC
-   - **Mappings**: Chọn **2 public subnets**
+   - **Mappings**: Chọn VPC và **ít nhất 2 Public Subnets** (ở các AZ khác nhau).
    - **Security group**: `b2b-alb-sg`
    - **Listener HTTP:80**: Default action → Forward to `shop-tg-two`
 3. Bấm **Create load balancer**
 
 ### Task 7.4: Cấu hình ALB Listener Rules (Path-Based Routing)
 
-1. **EC2** console → **Load Balancers** → Chọn `b2b-alb` → **Listeners and rules**
-2. Chọn **HTTP:80** listener → **Manage rules** → **Add rule**
+Vào listener **HTTP:80** của `b2b-alb`, chọn **Add rules** với thứ tự ưu tiên như sau:
 
-**Rule 1 (Priority 1):**
-- **Condition**: Path is `/api/auth/*`, `/login*`, `/register*`
-- **Action**: Forward to `auth-tg-two`
-
-**Rule 2 (Priority 2):**
-- **Condition**: Path is `/api/supplier/*`, `/admin/*`
-- **Action**: Forward to `supplier-tg-two`
-
-**Rule 3 (Priority 3):**
-- **Condition**: Path is `/api/shop/*`
-- **Action**: Forward to `shop-tg-two`
-
-Bảng tóm tắt listener rules:
-
-| Priority | Condition | Forward to |
+| Priority | Condition (Path is) | Action (Forward to) |
 |---|---|---|
-| 1 | `/api/auth/*`, `/login*`, `/register*` | `auth-tg-two` |
-| 2 | `/api/supplier/*`, `/admin/*` | `supplier-tg-two` |
-| 3 | `/api/shop/*` | `shop-tg-two` |
-| Default | Tất cả URL khác | `shop-tg-two` |
+| 1 | `/api/auth*`, `/login*`, `/register*` | `auth-tg-two` |
+| 2 | `/api/supplier*`, `/admin*` | `supplier-tg-two` |
+| 3 | `/api/shop*` | `shop-tg-two` |
+| Default | (Mọi path khác) | `shop-tg-two` |
 
 ---
 
 ## Phase 8: Tạo ba ECS Services
 
-### Task 8.1: Cấu hình ECS Service files
+### Task 8.1: Tự động hóa điền giá trị và Đăng ký Task Definitions
+
+Sau khi đã hoàn tất Phase 1 đến Phase 7, bạn đã có đầy đủ: ECR Images, RDS Endpoint, ALB, Target Groups và Security Groups.
+
+Bây giờ, hãy chạy kịch bản Bash duy nhất dưới đây. Script này sẽ tự động lấy mọi thông tin cần thiết từ AWS, điền vào các file JSON, đăng ký Task Definition mới và lấy chính xác số **Revision** để điền vào file tạo Service.
 
 ```bash
 cd ~/environment/SOA_PROJECT/deployment
 
-# Lấy Target Group ARNs
-auth_tg_two_arn=$(aws elbv2 describe-target-groups --names auth-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
-shop_tg_two_arn=$(aws elbv2 describe-target-groups --names shop-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
-supplier_tg_two_arn=$(aws elbv2 describe-target-groups --names supplier-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+# 1. Cấu hình các biến (HÃY SỬA TÊN S3 BUCKET CỦA BẠN TẠI ĐÂY)
+S3_BUCKET_NAME="b2b-marketplace-images" 
 
-# ⚠️ Thay các giá trị sau bằng giá trị thực từ VPC console:
-SUBNET_1="subnet-0123456789abcdef0"    # Public Subnet 1 ID
-SUBNET_2="subnet-0abcdef1234567890"    # Public Subnet 2 ID
-ECS_SG="sg-0123456789abcdef0"          # b2b-ecs-sg ID
+# 2. Lấy thông tin tài nguyên từ AWS
+echo "Đang lấy các giá trị từ AWS..."
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# Inject vào các file JSON
-sed -i "s|<PUBLIC-SUBNET-1-ID>|$SUBNET_1|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
-sed -i "s|<PUBLIC-SUBNET-2-ID>|$SUBNET_2|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
-sed -i "s|<B2B-ECS-SG-ID>|$ECS_SG|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
+AUTH_TG=$(aws elbv2 describe-target-groups --names auth-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+SHOP_TG=$(aws elbv2 describe-target-groups --names shop-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
+SUPPLIER_TG=$(aws elbv2 describe-target-groups --names supplier-tg-two --query 'TargetGroups[0].TargetGroupArn' --output text)
 
-# Inject Target Group ARNs
-sed -i "s|<ARN-auth-tg-two>|$auth_tg_two_arn|g" create-auth-microservice-tg-two.json
-sed -i "s|<ARN-shop-tg-two>|$shop_tg_two_arn|g" create-shop-microservice-tg-two.json
-sed -i "s|<ARN-supplier-tg-two>|$supplier_tg_two_arn|g" create-supplier-microservice-tg-two.json
+ECS_SG=$(aws ec2 describe-security-groups --filters Name=group-name,Values=b2b-ecs-sg --query 'SecurityGroups[0].GroupId' --output text)
 
-# Inject revision number
-sed -i "s|<REVISION-NUMBER>|1|g" create-auth-microservice-tg-two.json create-shop-microservice-tg-two.json create-supplier-microservice-tg-two.json
+SUBNETS=$(aws elbv2 describe-load-balancers --names b2b-alb --query 'LoadBalancers[0].AvailabilityZones[*].SubnetId' --output text)
+SUBNET_1=$(echo $SUBNETS | awk '{print $1}')
+SUBNET_2=$(echo $SUBNETS | awk '{print $2}')
+
+ALB_DNS=$(aws elbv2 describe-load-balancers --names b2b-alb --query 'LoadBalancers[0].DNSName' --output text)
+RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier b2bmarket-db --query 'DBInstances[0].Endpoint.Address' --output text)
+
+# 2. Cập nhật dữ liệu cho các file taskdef-*.json
+echo "Điền giá trị vào taskdef-*.json..."
+sed -i "s|<ACCOUNT-ID>|$ACCOUNT_ID|g" taskdef-*.json
+sed -i "s|<IMAGE1_NAME>|$ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/auth:latest|g" taskdef-auth.json
+sed -i "s|<IMAGE1_NAME>|$ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/shop:latest|g" taskdef-shop.json
+sed -i "s|<IMAGE1_NAME>|$ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/supplier:latest|g" taskdef-supplier.json
+sed -i "s|<RDS-ENDPOINT>|$RDS_ENDPOINT|g" taskdef-*.json
+sed -i "s|http://<ALB-DNS-NAME>|http://$ALB_DNS|g" taskdef-*.json
+
+# Đặc biệt cho Supplier/Auth/Shop (điền S3 và Session Shared DB)
+sed -i "s/\"name\": \"S3_BUCKET\", \"value\": \".*\"/\"name\": \"S3_BUCKET\", \"value\": \"$S3_BUCKET_NAME\"/g" taskdef-supplier.json
+
+# Bảo đảm biến SESSION_DB_NAME luôn có mặt để tránh lỗi login
+sed -i "/\"name\": \"SESSION_DB_NAME\"/!i {\"name\": \"SESSION_DB_NAME\", \"value\": \"auth_db\"}," taskdef-*.json
+
+# 3. Đăng ký Task Definitions mới lên ECS và bắt lấy chính xác REVISION ARN
+echo "Đang đăng ký Task Definitions để lấy Revision ARN..."
+AUTH_REV_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef-auth.json --query 'taskDefinition.taskDefinitionArn' --output text)
+SHOP_REV_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef-shop.json --query 'taskDefinition.taskDefinitionArn' --output text)
+SUPPLIER_REV_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef-supplier.json --query 'taskDefinition.taskDefinitionArn' --output text)
+
+# Lấy số Revision để điền vào file Create Service
+AUTH_REV=$(echo $AUTH_REV_ARN | awk -F: '{print $NF}')
+SHOP_REV=$(echo $SHOP_REV_ARN | awk -F: '{print $NF}')
+SUPPLIER_REV=$(echo $SUPPLIER_REV_ARN | awk -F: '{print $NF}')
+
+echo "-> Revision mới nhất: Auth=$AUTH_REV | Shop=$SHOP_REV | Supplier=$SUPPLIER_REV"
+
+# 4. Cập nhật dữ liệu cho các file create-*.json
+echo "Điền giá trị vào create-*.json..."
+sed -i "s|<ARN-auth-tg-two>|$AUTH_TG|g" create-auth-microservice-tg-two.json
+sed -i "s|<REVISION-NUMBER>|$AUTH_REV|g" create-auth-microservice-tg-two.json
+
+sed -i "s|<ARN-shop-tg-two>|$SHOP_TG|g" create-shop-microservice-tg-two.json
+sed -i "s|<REVISION-NUMBER>|$SHOP_REV|g" create-shop-microservice-tg-two.json
+
+sed -i "s|<ARN-supplier-tg-two>|$SUPPLIER_TG|g" create-supplier-microservice-tg-two.json
+sed -i "s|<REVISION-NUMBER>|$SUPPLIER_REV|g" create-supplier-microservice-tg-two.json
+
+sed -i "s|<PUBLIC-SUBNET-1-ID>|$SUBNET_1|g" create-*.json
+sed -i "s|<PUBLIC-SUBNET-2-ID>|$SUBNET_2|g" create-*.json
+sed -i "s|<B2B-ECS-SG-ID>|$ECS_SG|g" create-*.json
+
+# 5. Cập nhật các file AppSpec (Dùng cho CodeDeploy Blue/Green)
+echo "Đang cập nhật các file appspec-*.yaml..."
+sed -i "s|<TASK_DEFINITION>|$AUTH_REV_ARN|g" appspec-auth.yaml
+sed -i "s|<TASK_DEFINITION>|$SHOP_REV_ARN|g" appspec-shop.yaml
+sed -i "s|<TASK_DEFINITION>|$SUPPLIER_REV_ARN|g" appspec-supplier.yaml
+
+echo "Hoàn tất kịch bản! Các file JSON và AppSpec đã sẵn sàng."
 ```
+
 
 ### Task 8.2: Tạo 3 ECS Services
 
@@ -767,6 +754,8 @@ aws deploy create-deployment-group \
   --load-balancer-info "targetGroupPairInfoList=[{targetGroups=[{name=auth-tg-two},{name=auth-tg-one}],prodTrafficRoute={listenerArns=[$listener_arn]}}]" \
   --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL \
   --blue-green-deployment-configuration "terminateBlueInstancesOnDeploymentSuccess={action=TERMINATE,terminationWaitTimeInMinutes=5},deploymentReadyOption={actionOnTimeout=CONTINUE_DEPLOYMENT}"
+
+echo "Cấu hình CodeDeploy hoàn tất!"
 ```
 
 Xác nhận: **CodeDeploy** console → `b2b-marketplace` → xác nhận 3 deployment groups.
@@ -796,6 +785,13 @@ File `.github/workflows/deploy.yml` đã có sẵn trong project. Workflow này:
    - `aws_access_key_id`
    - `aws_secret_access_key`
    - `aws_session_token`
+
+4. Truy cập GitHub Repo của bạn → **Settings** → **Secrets and variables** → **Actions**
+5. Tạo 4 **Repository secrets**:
+   - `AWS_ACCESS_KEY_ID`: Dán giá trị từ Lab
+   - `AWS_SECRET_ACCESS_KEY`: Dán giá trị từ Lab
+   - `AWS_SESSION_TOKEN`: Dán giá trị từ Lab
+   - `S3_BUCKET`: `b2b-marketplace-images-23521076` (Hoặc bucket của bạn)
 
 > ⚠️ **QUAN TRỌNG**: Credentials Learner Lab **hết hạn mỗi khi lab session kết thúc**. Bạn phải update GitHub Secrets mỗi khi start lab mới.
 

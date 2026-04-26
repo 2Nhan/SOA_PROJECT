@@ -20,16 +20,28 @@ app.use(express.static(path.join(__dirname, "public"), {
 
 // Session setup
 const sessionStore = new MySQLStore({
-  host: dbConfig.HOST, port: dbConfig.PORT, user: dbConfig.USER,
-  password: dbConfig.PASSWORD, database: dbConfig.DB,
-  createDatabaseTable: true, schema: { tableName: "sessions" }
+  host: dbConfig.HOST,
+  port: dbConfig.PORT,
+  user: dbConfig.USER,
+  password: dbConfig.PASSWORD,
+  database: process.env.SESSION_DB_NAME || dbConfig.DB,
+  createDatabaseTable: true,
+  schema: { tableName: "sessions" }
 });
 
 app.use(session({
   key: "b2b_session",
   secret: process.env.SESSION_SECRET || "b2b-shared-secret-key-change-in-production",
-  store: sessionStore, resave: false, saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: "lax", maxAge: 24 * 60 * 60 * 1000 }
+  store: sessionStore,
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 app.use((req, res, next) => {

@@ -9,17 +9,33 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 
 exports.applyStandardMiddlewares = (app) => {
+    // Middleware để "cắt đuôi" prefix từ Load Balancer (ALB)
+    app.use((req, res, next) => {
+        const prefixes = ["/api/auth", "/api/shop", "/api/supplier"];
+        for (const prefix of prefixes) {
+            if (req.url.startsWith(prefix)) {
+                req.url = req.url.slice(prefix.length) || "/";
+                break;
+            }
+        }
+        next();
+    });
+
+    const directives = helmet.contentSecurityPolicy.getDefaultDirectives();
+    delete directives["upgrade-insecure-requests"]; // Xóa bỏ hoàn toàn việc ép HTTPS
+
     app.use(helmet({
         contentSecurityPolicy: {
             directives: {
-                defaultSrc: ["'self'"],
-                scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
-                fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
-                imgSrc: ["'self'", "data:", "https:"],
-                connectSrc: ["'self'"],
+                ...directives,
+                "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+                "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+                "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+                "img-src": ["'self'", "data:", "https:"],
+                "connect-src": ["'self'"],
             }
-        }
+        },
+        hsts: false
     }));
 
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);

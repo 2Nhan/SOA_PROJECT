@@ -48,6 +48,10 @@
         {
           "name": "SHOP_SERVICE_URL",
           "value": "http://<ALB-DNS-NAME>"
+        },
+        {
+          "name": "SESSION_DB_NAME",
+          "value": "auth_db"
         }
       ],
       "essential": true,

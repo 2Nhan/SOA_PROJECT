@@ -141,13 +141,20 @@ exports.login = (req, res) => {
             return res.render("login", { error: "Login failed" });
         }
         req.session.user = user;
-        // Role-based redirect
-        if (user.role === "supplier" || user.role === "admin") {
-            const supplierUrl = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8081";
-            return res.redirect(supplierUrl + "/admin/");
-        }
-        const shopUrl = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
-        res.redirect(shopUrl + "/");
+        // Bắt buộc lưu session vào DB trước khi redirect để tránh Race Condition trên AWS
+        req.session.save((err) => {
+            if (err) {
+                console.error("Session save error:", err);
+                return res.render("login", { error: "Login failed to persist" });
+            }
+            // Role-based redirect
+            if (user.role === "supplier" || user.role === "admin") {
+                const supplierUrl = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8081";
+                return res.redirect(supplierUrl + "/admin/");
+            }
+            const shopUrl = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
+            res.redirect(shopUrl + "/");
+        });
     });
 };
 
