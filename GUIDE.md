@@ -276,17 +276,37 @@ docker exec -i mysql-test mysql -uroot -prootpass < deployment/shop_db_init.sql
 
 ### Task 4.3: Build and test the Shop microservice
 
-> **Important:** Start the Auth microservice before testing any login flow. The Shop and Supplier services render their own login pages, but both authenticate by calling the Auth API. If Auth is not running, the page can load while login still fails.
+> **Important:** Start the Auth microservice **first** before Shop and Supplier. Both services authenticate by calling the Auth API. If Auth is not running, pages may load but login will fail.
 
 ```bash
 cd ~/environment/SOA_PROJECT
 
-# Build the Docker image from the root context (so it can access shared code)
+# Build ALL three Docker images first (from root context so shared/ is accessible)
+docker build -t auth -f ./microservices/auth/docker/Dockerfile .
 docker build -t shop -f ./microservices/shop/docker/Dockerfile .
+docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
 
 # View built images
 docker images
+```
 
+**Step 1: Start Auth first** (required by Shop and Supplier for login):
+```bash
+# Run the Auth container
+docker run -d --name auth_1 -p 8082:8082 \
+  -e APP_DB_HOST="172.17.0.1" \
+  -e APP_DB_USER="root" \
+  -e APP_DB_PASSWORD="rootpass" \
+  -e APP_DB_NAME="auth_db" \
+  -e APP_DB_PORT="3306" \
+  -e SESSION_DB_HOST="172.17.0.1" \
+  auth
+```
+
+Test: Access `http://<Cloud9-Public-IP>:8082/health`. Confirm it returns `{"status":"ok"}`.
+
+**Step 2: Start Shop:**
+```bash
 # Run the Shop container
 docker run -d --name shop_1 -p 8080:8080 \
   -e APP_DB_HOST="172.17.0.1" \
@@ -294,6 +314,7 @@ docker run -d --name shop_1 -p 8080:8080 \
   -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="shop_db" \
   -e APP_DB_PORT="3306" \
+  -e SESSION_DB_HOST="172.17.0.1" \
   -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
   -e SUPPLIER_SERVICE_URL="http://172.17.0.1:8081" \
   shop
@@ -310,14 +331,6 @@ Test: Use **Cloud9 Preview** (Tools → Preview → Preview Running Application)
 ### Task 4.4: Build and test the Supplier microservice
 
 ```bash
-cd ~/environment/SOA_PROJECT
-
-# Pull latest code if working across devices
-git pull origin main
-
-# Build the Docker image
-docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
-
 # Run the Supplier container
 docker run -d --name supplier_1 -p 8081:8080 \
   -e APP_DB_HOST="172.17.0.1" \
@@ -325,6 +338,7 @@ docker run -d --name supplier_1 -p 8081:8080 \
   -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="supplier_db" \
   -e APP_DB_PORT="3306" \
+  -e SESSION_DB_HOST="172.17.0.1" \
   -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
   -e SHOP_SERVICE_URL="http://172.17.0.1:8080" \
   supplier
@@ -336,25 +350,24 @@ Test: Use **Cloud9 Preview** or access `http://<Cloud9-Public-IP>:8081/admin/log
 
 > **Tip**: For Cloud9 Preview on port 8081, change the preview URL port from 8080 to 8081.
 
-### Task 4.4b: Build and test the Auth microservice
+### Task 4.4b: Verify all services are running
 
 ```bash
-cd ~/environment/SOA_PROJECT
+# Check all containers are running
+docker ps
 
-# Build the Docker image
-docker build -t auth -f ./microservices/auth/docker/Dockerfile .
+# Test health endpoints
+curl http://localhost:8082/health
+curl http://localhost:8080/health
+curl http://localhost:8081/health
 
-# Run the Auth container
-docker run -d --name auth_1 -p 8082:8082 \
-  -e APP_DB_HOST="172.17.0.1" \
-  -e APP_DB_USER="root" \
-  -e APP_DB_PASSWORD="rootpass" \
-  -e APP_DB_NAME="auth_db" \
-  -e APP_DB_PORT="3306" \
-  auth
+# Check logs if any container is not running
+docker logs auth_1
+docker logs shop_1
+docker logs supplier_1
 ```
 
-Test: Access `http://<Cloud9-Public-IP>:8082/health` in a browser. Confirm it returns `{"status":"ok"}`.
+All three health endpoints should return `{"status":"ok"}`.
 
 ### Task 4.5: Clean up test containers
 

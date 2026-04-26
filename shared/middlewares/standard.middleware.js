@@ -22,7 +22,9 @@ exports.applyStandardMiddlewares = (app) => {
                 frameSrc: ["'none'"],
                 objectSrc: ["'none'"]
             }
-        }
+        },
+        // Allow Cloud9 Preview and ALB health checks to embed in iframe
+        frameguard: false
     }));
 
     // CORS with restricted origins (Fix #11)
