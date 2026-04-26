@@ -9,14 +9,15 @@ const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
 function getInternalHeaders(extraHeaders = {}) {
-    if (!INTERNAL_API_KEY) {
-        throw new Error("INTERNAL_API_KEY is required for inter-service calls");
+    if (!INTERNAL_API_KEY && process.env.NODE_ENV === "production") {
+        throw new Error("INTERNAL_API_KEY is required for inter-service calls in production");
     }
 
-    return {
-        ...extraHeaders,
-        "x-api-key": INTERNAL_API_KEY
-    };
+    const headers = { ...extraHeaders };
+    if (INTERNAL_API_KEY) {
+        headers["x-api-key"] = INTERNAL_API_KEY;
+    }
+    return headers;
 }
 
 /**

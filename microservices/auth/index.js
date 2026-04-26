@@ -9,11 +9,12 @@ const authRoutes = require("./src/routes/auth.routes");
 
 const app = express();
 const PORT = process.env.PORT || 8082;
-const sessionSecret = process.env.SESSION_SECRET;
+const isProduction = process.env.NODE_ENV === "production";
+const sessionSecret = process.env.SESSION_SECRET || (isProduction ? null : "dev-session-secret-change-me");
 const sessionDbPassword = process.env.SESSION_DB_PASSWORD || process.env.APP_DB_PASSWORD;
 
 if (!sessionSecret) {
-    throw new Error("SESSION_SECRET is required");
+    throw new Error("SESSION_SECRET is required in production");
 }
 if (!sessionDbPassword) {
     throw new Error("SESSION_DB_PASSWORD or APP_DB_PASSWORD is required");

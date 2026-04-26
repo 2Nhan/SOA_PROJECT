@@ -292,6 +292,8 @@ docker run -d --name shop_1 -p 8080:8080 \
   -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="shop_db" \
   -e APP_DB_PORT="3306" \
+  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
+  -e SUPPLIER_SERVICE_URL="http://172.17.0.1:8081" \
   shop
 
 # Note: On Cloud9 Linux, use 172.17.0.1 (Docker Bridge Gateway) for database connectivity
@@ -321,6 +323,8 @@ docker run -d --name supplier_1 -p 8081:8080 \
   -e APP_DB_PASSWORD="rootpass" \
   -e APP_DB_NAME="supplier_db" \
   -e APP_DB_PORT="3306" \
+  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
+  -e SHOP_SERVICE_URL="http://172.17.0.1:8080" \
   supplier
 ```
 
@@ -599,7 +603,10 @@ sed -i "s|<INTERNAL-API-KEY>|$internal_api_key|g" taskdef-auth.json taskdef-shop
 4. Create a second security group — the **ECS Tasks Security Group**:
    - **Name**: `b2b-ecs-sg`
    - **VPC**: LabVPC (or your chosen VPC)
-   - **Inbound Rules**: Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB security group)
+   - **Inbound Rules**:
+     - Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB → Shop/Supplier)
+     - Type: **Custom TCP**, Port: **8082**, Source: **Custom** → `b2b-alb-sg` (ALB → Auth)
+     - Type: **Custom TCP**, Port: **8082**, Source: **Custom** → `b2b-ecs-sg` (Shop/Supplier → Auth internal calls)
    - **Outbound Rules**: Default (all traffic — needed for ECR pulls, RDS access, S3 access, CloudWatch)
 5. Select **Create security group**
 6. Update the RDS security group (`b2b-rds-sg`) to allow traffic from ECS:
@@ -613,11 +620,14 @@ The final layered network architecture:
 │  Inbound:  TCP 80 from 0.0.0.0/0 (Internet)             │
 │  Outbound: All traffic                                  │
 └──────────────────────┬──────────────────────────────────┘
-                       │ TCP 8080
+                       │ TCP 8080 (Shop/Supplier)
+                       │ TCP 8082 (Auth)
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │  b2b-ecs-sg (ECS Tasks Security Group)                  │
-│  Inbound:  TCP 8080 from b2b-alb-sg only                │
+│  Inbound:  TCP 8080 from b2b-alb-sg                     │
+│            TCP 8082 from b2b-alb-sg                     │
+│            TCP 8082 from b2b-ecs-sg (internal Auth calls)│
 │  Outbound: All traffic (ECR, S3, CloudWatch, RDS)       │
 └──────────────────────┬──────────────────────────────────┘
                        │ TCP 3306

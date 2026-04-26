@@ -92,8 +92,9 @@ Key design decisions:
 ```
 
 Traffic routing is handled by a single Application Load Balancer with path-based rules:
-- All requests to `/admin/*` are forwarded to the Supplier service
-- All other requests are forwarded to the Shop service
+- All requests to `/admin/*` are forwarded to the Supplier service (port 8080)
+- Auth service is accessible internally on port 8082 (Shop and Supplier call it for session/user data)
+- All other requests are forwarded to the Shop service (port 8080)
 - Health checks on `/health` ensure only healthy containers receive traffic
 
 ---
@@ -252,13 +253,13 @@ Stage 2: DEPLOY (CLI → CodeDeploy → ECS Blue/Green)
 ### Build and Deploy Workflow
 
 ```bash
-# 1. Build Docker image locally or on Cloud9
-cd microservices/shop
-docker build -t shop .
+# 1. Build Docker image from project root (shared/ folder must be in context)
+docker build -t shop -f ./microservices/shop/docker/Dockerfile .
 
 # 2. Tag and push to ECR
-account_id=$(aws sts get-caller-identity | grep Account | cut -d '"' -f4)
+account_id=$(aws sts get-caller-identity --query Account --output text)
 docker tag shop:latest $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $account_id.dkr.ecr.us-east-1.amazonaws.com
 docker push $account_id.dkr.ecr.us-east-1.amazonaws.com/shop:latest
 
 # 3. Trigger CodeDeploy blue/green deployment via CLI
@@ -276,8 +277,8 @@ aws deploy create-deployment \
 
 | AWS Service | Purpose | Configuration |
 |---|---|---|
-| Amazon ECS (Fargate) | Container orchestration | 2 services, 1 task each, 0.25 vCPU / 512MB RAM |
-| Amazon ECR | Docker image registry | 2 private repositories (shop, supplier) |
+| Amazon ECS (Fargate) | Container orchestration | 3 services (auth, shop, supplier), 1 task each, 0.25 vCPU / 512MB RAM |
+| Amazon ECR | Docker image registry | 3 private repositories (auth, shop, supplier) |
 | Application Load Balancer | Traffic routing & health checks | Path-based routing (`/admin/*` → Supplier, default → Shop), 4 target groups for blue/green |
 | Amazon RDS (MySQL 8.0) | Managed database | db.c6gd.medium, Single-AZ, 20GB gp3 |
 | Amazon S3 | Product image storage | Public-read bucket for supplier product photos |
@@ -576,9 +577,9 @@ docker-compose down -v       # Stop services, delete database volume
 │   ├── taskdef-auth.json             
 │   └── ...
 ├── shared/                               # DRY package: Reused code across all services
-│   ├── clients/                          # HTTP integrations (e.g., auth.client.js)
+│   ├── clients/                          # HTTP integrations (auth.client.js, shop.client.js, supplier.client.js)
 │   ├── config/                           # Standard DB pool setup
-│   └── middlewares/                      # Auth guards, JSON-aware error handling
+│   └── middlewares/                      # Auth guards, API key protection, JSON-aware error handling
 └── microservices/
     ├── auth/                             # Auth Identity Microservice
     │   ├── package.json
@@ -622,7 +623,7 @@ docker-compose down -v       # Stop services, delete database volume
 
 | Layer | Technology |
 |---|---|
-| Runtime | Node.js 18 (Alpine) |
+| Runtime | Node.js 20 (Alpine) |
 | Framework | Express.js 4.x |
 | Template Engine | EJS with Bootstrap 5 |
 | Database | MySQL 8.0 (via mysql2 connection pool) |
