@@ -294,6 +294,8 @@ sed -i 's/b2b-marketplace-images/{Tên bucket của bạn}/g' .github/workflows/
 
 ## Phase 4: Build và test Microservices trên Docker (Local)
 
+> **Sử dụng Docker Compose** để khởi chạy toàn bộ hệ thống (MySQL + 3 microservices) chỉ với vài lệnh. Docker Compose tự động: tạo network, khởi tạo database, cấu hình biến môi trường, và quản lý thứ tự khởi động.
+
 ### Task 4.1: Mở cổng trên Security Group của Cloud9
 
 1. Trong **EC2 Console**, vào tab Security chọn link ở Security Group của Cloud9 instance
@@ -303,85 +305,82 @@ sed -i 's/b2b-marketplace-images/{Tên bucket của bạn}/g' .github/workflows/
    - Custom TCP, Port **8082**, Source: `0.0.0.0/0`(AnywhereV4)
 3. Bấm **Save rules**
 
-### Task 4.2: Chạy MySQL test local
+### Task 4.2: Cài đặt Docker Compose v2
+
+Cloud9 (Amazon Linux 2) chưa cài sẵn Docker Compose. Cài bằng lệnh:
+
+```bash
+# Tạo thư mục plugin
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
+# Tải Docker Compose v2 (Linux x86_64)
+sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Phân quyền thực thi
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Xóa buildx plugin nếu bị lỗi exec format
+sudo rm -f /usr/local/lib/docker/cli-plugins/docker-buildx
+
+# Kiểm tra
+docker compose version
+```
+
+Phải trả về `Docker Compose version v2.x.x`.
+
+### Task 4.3: Build và chạy toàn bộ hệ thống
 
 ```bash
 cd ~/environment/SOA_PROJECT
 
-# Chạy MySQL container
-docker run -d \
-  --name mysql-test \
-  -e MYSQL_ROOT_PASSWORD=rootpass \
-  -p 3306:3306 \
-  mysql:8.0
+# Build Docker images cho 3 services
+docker build -t soa_project-auth -f ./microservices/auth/docker/Dockerfile .
+docker build -t soa_project-shop -f ./microservices/shop/docker/Dockerfile .
+docker build -t soa_project-supplier -f ./microservices/supplier/docker/Dockerfile .
 
-# Đợi MySQL khởi động (~15 giây)
-sleep 15
-
-# Khởi tạo 3 database
-docker exec -i mysql-test mysql -uroot -prootpass < deployment/auth_db_init.sql
-docker exec -i mysql-test mysql -uroot -prootpass < deployment/supplier_db_init.sql
-docker exec -i mysql-test mysql -uroot -prootpass < deployment/shop_db_init.sql
+# Khởi chạy toàn bộ (MySQL + Auth + Shop + Supplier)
+docker compose up
 ```
 
-### Task 4.3: Build và test Auth microservice
-
-```bash
-cd ~/environment/SOA_PROJECT
-docker build -t auth -f ./microservices/auth/docker/Dockerfile .
-
-docker run -d --name auth_1 -p 8082:8082 \
-  -e APP_DB_HOST="172.17.0.1" \
-  -e APP_DB_USER="root" \
-  -e APP_DB_PASSWORD="rootpass" \
-  -e APP_DB_NAME="auth_db" \
-  -e APP_DB_PORT="3306" \
-  auth
+Đợi đến khi thấy cả 3 service hiển thị:
+```
+auth-1      | [Auth Service] Configured and running on port 8082
+shop-1      | [Shop Service] Configured and running on port 8080
+supplier-1  | [Supplier Service] Configured and running on port 8080
 ```
 
-Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8082/health` → phải trả về `{"status":"ok"}`.
+> ⚠️ Docker Compose sẽ tự động: tạo MySQL container, chạy init SQL scripts (seed data), tạo Docker network, và khởi động 3 services theo đúng thứ tự.
 
-### Task 4.4: Build và test Shop microservice
+### Task 4.4: Kiểm tra hệ thống
+
+Mở terminal mới (giữ docker compose chạy ở terminal cũ):
 
 ```bash
-cd ~/environment/SOA_PROJECT
-docker build -t shop -f ./microservices/shop/docker/Dockerfile .
+# Test Health Check
+curl -s http://localhost:8082/health   # Auth  → {"status":"ok"}
+curl -s http://localhost:8080/health   # Shop  → {"status":"ok"}
+curl -s http://localhost:8081/health   # Supplier → {"status":"ok"}
 
-docker run -d --name shop_1 -p 8080:8080 \
-  -e APP_DB_HOST="172.17.0.1" \
-  -e APP_DB_USER="root" \
-  -e APP_DB_PASSWORD="rootpass" \
-  -e APP_DB_NAME="shop_db" \
-  -e APP_DB_PORT="3306" \
-  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
-  -e SUPPLIER_SERVICE_URL="http://172.17.0.1:8081" \
-  shop
+# Test API lấy sản phẩm
+curl -s -H "X-Internal-Api-Key: b2b-internal-key-change-in-production" \
+  http://localhost:8081/api/supplier/products/active
 ```
 
-Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8080`. Thử đăng nhập với `shop1@b2bmarket.com` / `password123`.
+Kiểm tra trên browser:
 
-### Task 4.5: Build và test Supplier microservice
+| URL | Mô tả | Tài khoản test |
+|---|---|---|
+| `http://<Cloud9-Public-IP>:8080` | Shop — trang mua hàng | `shop1@b2bmarket.com` / `password123` |
+| `http://<Cloud9-Public-IP>:8081/admin/login` | Supplier — quản lý sản phẩm | `supplier1@b2bmarket.com` / `password123` |
+| `http://<Cloud9-Public-IP>:8082/login` | Auth — đăng nhập trực tiếp | `admin@b2bmarket.com` / `admin123` |
 
+Sau khi đăng nhập Shop, vào tab **Products** phải thấy 6 sản phẩm từ database.
+
+Khi test xong, dọn dẹp:
 ```bash
-cd ~/environment/SOA_PROJECT
-docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
-
-docker run -d --name supplier_1 -p 8081:8080 \
-  -e APP_DB_HOST="172.17.0.1" \
-  -e APP_DB_USER="root" \
-  -e APP_DB_PASSWORD="rootpass" \
-  -e APP_DB_NAME="supplier_db" \
-  -e APP_DB_PORT="3306" \
-  -e AUTH_SERVICE_URL="http://172.17.0.1:8082" \
-  supplier
-```
-
-Kiểm tra: Truy cập `http://<Cloud9-Public-IP>:8081/admin/login`.
-
-### Task 4.6: Dọn dẹp test containers
-
-```bash
-docker rm -f shop_1 supplier_1 auth_1 mysql-test
+# Ctrl+C để dừng docker compose, sau đó:
+docker compose down -v
 ```
 
 ---
