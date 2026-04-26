@@ -561,11 +561,16 @@ mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployme
 
 Verify (note: use the same database password you set when creating RDS):
 ```bash
-# Check tables in auth_db
+# Check tables in each database
 mysql -h <RDS-ENDPOINT> -u admin -prootpass auth_db -e "SHOW TABLES;"
+mysql -h <RDS-ENDPOINT> -u admin -prootpass shop_db -e "SHOW TABLES;"
+mysql -h <RDS-ENDPOINT> -u admin -prootpass supplier_db -e "SHOW TABLES;"
 ```
 
-You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orders`, `payments`.
+You should see:
+- **`auth_db`**: `users` (and auto-created `sessions` table)
+- **`shop_db`**: `rfqs`, `orders`
+- **`supplier_db`**: `products`, `quotes`, `contracts`, `payments`
 
 ### Task 6.4: Update task definitions with the RDS endpoint
 

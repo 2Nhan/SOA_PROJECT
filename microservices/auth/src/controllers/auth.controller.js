@@ -180,13 +180,16 @@ exports.login = (req, res) => {
             return res.render("login", { error: "Login failed" });
         }
         req.session.user = user;
-        // Role-based redirect
-        if (user.role === "supplier" || user.role === "admin") {
-            const supplierUrl = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8080";
-            return res.redirect(supplierUrl + (user.role === "admin" ? "/admin/manage" : "/admin/"));
-        }
-        const shopUrl = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
-        res.redirect(shopUrl + "/");
+        req.session.save((err) => {
+            if (err) return res.render("login", { error: "Session error. Please try again." });
+            // Role-based redirect
+            if (user.role === "supplier" || user.role === "admin") {
+                const supplierUrl = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8080";
+                return res.redirect(supplierUrl + (user.role === "admin" ? "/admin/manage" : "/admin/"));
+            }
+            const shopUrl = process.env.SHOP_SERVICE_URL || "http://localhost:8080";
+            res.redirect(shopUrl + "/");
+        });
     });
 };
 

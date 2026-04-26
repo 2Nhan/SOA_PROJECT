@@ -33,7 +33,7 @@
 
     <!-- Stats -->
     <% var totalU=users.length, pendingU=0, suppliers=0, buyers=0;
-       users.forEach(function(u){ if(u.status==='pending') pendingU++; if(u.role==='supplier') suppliers++; if(u.role==='buyer') buyers++; }); %>
+       users.forEach(function(u){ if(u.status==='pending') pendingU++; if(u.role==='supplier') suppliers++; if(u.role==='shop') buyers++; }); %>
     <div class="row g-3 mb-4">
       <div class="col-6 col-md-3"><div class="card shadow-sm stat-card p-3 text-center"><div class="fs-3 fw-bold text-primary"><%= totalU %></div><small class="text-muted">Total Users</small></div></div>
       <div class="col-6 col-md-3"><div class="card shadow-sm stat-card p-3 text-center"><div class="fs-3 fw-bold text-warning"><%= pendingU %></div><small class="text-muted">Pending Approval</small></div></div>

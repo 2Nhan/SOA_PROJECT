@@ -56,6 +56,7 @@ function httpGet(url, timeoutMs) {
         req.on("error", (err) => {
             reject(new Error(`Shop service unreachable: ${err.message}`));
         });
+        req.end();
     });
 }
 

@@ -10,13 +10,14 @@ Hệ thống đã được quy hoạch lại để rõ ràng ranh giới giữa 
 
 ```text
 microservices/[service-name]/src/
-├── api/          # ⬅️ INTERNAL API: Trả về dữ liệu thô (JSON) cho các service khác gọi.
-├── clients/      # ⬅️ HTTP CLIENTS: Code dùng để gọi (fetch/axios) sang service khác.
+├── api/          # ⬅️ INTERNAL API: Trả về dữ liệu thô (JSON) cho các service khác gọi. (Shop & Supplier only — Auth không có thư mục này)
 ├── controllers/  # ⬅️ WEB UI: Trả về giao diện (HTML/EJS), redirect trang, báo lỗi cho user thật.
 ├── models/       # ⬅️ DATABASE MODELS: Thao tác trực tiếp với Database của chính nó.
 ├── routes/       # ⬅️ ROUTERS: Khai báo các endpoint.
 └── config/       # ⬅️ Cấu hình Local.
 ```
+
+> **Lưu ý:** Auth service không có thư mục `src/api/`. Logic API của Auth được xử lý trực tiếp trong `auth.controller.js`. Chỉ Shop và Supplier mới có `src/api/`.
 
 ### 💡 Sự khác biệt bạn cần nắm rõ:
 - **`controllers/` vs `api/`**: 
@@ -34,8 +35,7 @@ microservices/[service-name]/src/
 shared/
 ├── clients/      # Chứa các HTTP clients dùng chung (Vd: auth.client.js dùng cho cả Shop và Supplier)
 ├── config/       # Wrapper cấu hình Database nội bộ (db.config.js)
-├── middlewares/  # Middleware xác thực (auth.middleware.js) & xử lý lỗi xài chung
-└── utils/        # Hàm helper dùng chung
+└── middlewares/  # Middleware xác thực (auth.middleware.js) & xử lý lỗi xài chung
 ```
 
 **⚠️ Lưu ý quan trọng:** Không viết lại logic Database, File Upload, hay Check Login ở từng service. Hãy luôn Import từ `shared/`.

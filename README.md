@@ -587,8 +587,8 @@ docker-compose down -v       # Stop services, delete database volume
     │   ├── docker/                       # Dockerfile for build context
     │   ├── src/                          # Auth Domain Logic
     │   │   ├── config/                   # Local db configuration overrides
-    │   │   ├── api/                      # REST API (JSON) serving Machine-to-Machine
-    │   │   ├── controllers/              # Web UI serving EJS templates
+    │   │   ├── controllers/              # Web UI + API logic (auth.controller.js)
+    │   │   ├── models/                   # Database models (auth.model.js)
     │   │   └── routes/                   # auth.routes.js mapping logic
     │   └── views/
     ├── shop/                             # Shop (Buyer) Microservice

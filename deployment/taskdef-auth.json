@@ -46,6 +46,14 @@
                     "value": "<SESSION-SECRET>"
                 },
                 {
+                    "name": "SESSION_DB_HOST",
+                    "value": "<RDS-ENDPOINT>"
+                },
+                {
+                    "name": "SESSION_DB_NAME",
+                    "value": "auth_db"
+                },
+                {
                     "name": "NODE_ENV",
                     "value": "production"
                 },
