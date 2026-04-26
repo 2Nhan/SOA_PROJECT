@@ -5,14 +5,16 @@ info:
   version: 1.0.0
 servers:
   - url: http://localhost:8080
-    description: Shop / Supplier Gateway
+    description: Shop Service
+  - url: http://localhost:8081
+    description: Supplier Service
   - url: http://localhost:8082
     description: Auth Service
 paths:
-  /api/users:
+  /api/auth/users:
     get:
       summary: Fetch users by IDs (Batch)
-      description: Used by Auth Service to resolve user references without N+1 queries.
+      description: Used by Shop/Supplier services to resolve user references without N+1 queries.
       parameters:
         - in: query
           name: ids
@@ -23,22 +25,81 @@ paths:
       responses:
         '200':
           description: A JSON array of users
-  /api/products:
+  /api/supplier/products:
     get:
-      summary: Fetch products from Supplier Service
+      summary: Fetch products from Supplier Service (batch by IDs)
+      parameters:
+        - in: query
+          name: ids
+          schema:
+            type: string
+          example: "1,2,3"
       responses:
         '200':
           description: Successful
-  /api/rfqs:
+  /api/supplier/products/active:
+    get:
+      summary: Fetch all active products
+      responses:
+        '200':
+          description: Successful
+  /api/supplier/products/{id}/reduce-stock:
+    post:
+      summary: Reduce stock for a product (Saga step)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+      responses:
+        '200':
+          description: Stock reduced successfully
+        '409':
+          description: Insufficient stock
+  /api/shop/rfqs:
     get:
       summary: Fetch RFQs from Shop Service
+      parameters:
+        - in: query
+          name: supplier_id
+          schema:
+            type: integer
       responses:
         '200':
           description: Successful
-  /api/orders:
-    post:
-      summary: Create an order (Saga transaction)
-      description: Initiates an order and reduces stock on Supplier service.
+  /api/shop/orders/all:
+    get:
+      summary: Fetch all orders from Shop Service
       responses:
-        '201':
-          description: Created
+        '200':
+          description: Successful
+  /api/shop/orders/{id}/status:
+    post:
+      summary: Update order status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, confirmed, cancelled, paid, shipped, delivered]
+      responses:
+        '200':
+          description: Status updated

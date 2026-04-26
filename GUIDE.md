@@ -9,7 +9,7 @@
 - [Phase 5: Creating ECR Repositories, ECS Cluster, Task Definitions, and AppSpec Files](#phase-5-creating-ecr-repositories-ecs-cluster-task-definitions-and-appspec-files)
 - [Phase 6: Creating the Database (Amazon RDS)](#phase-6-creating-the-database-amazon-rds)
 - [Phase 7: Creating Target Groups and an Application Load Balancer](#phase-7-creating-target-groups-and-an-application-load-balancer)
-- [Phase 8: Creating Two Amazon ECS Services](#phase-8-creating-two-amazon-ecs-services)
+- [Phase 8: Creating Three Amazon ECS Services](#phase-8-creating-three-amazon-ecs-services)
 - [Phase 9: Configuring CodeDeploy (Blue/Green Deployment)](#phase-9-configuring-codedeploy-blue-green-deployment)
 - [Phase 10: Testing the CI/CD Deployment](#phase-10-testing-the-cicd-deployment)
 - [Phase 11: Setting Up CloudWatch Monitoring](#phase-11-setting-up-cloudwatch-monitoring)
@@ -555,10 +555,10 @@ mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployme
 mysql -h <RDS-ENDPOINT> -u admin -prootpass < ~/environment/SOA_PROJECT/deployment/shop_db_init.sql
 ```
 
-Verify (note: you must include `-u admin -plab-password` and the specific database name):
+Verify (note: you must include `-u admin -prootpass` and the specific database name):
 ```bash
 # Check tables in auth_db
-mysql -h <RDS-ENDPOINT> -u admin -plab-password auth_db -e "SHOW TABLES;"
+mysql -h <RDS-ENDPOINT> -u admin -prootpass auth_db -e "SHOW TABLES;"
 ```
 
 You should see tables: `users`, `products`, `rfqs`, `quotes`, `contracts`, `orders`, `payments`.
@@ -591,7 +591,10 @@ sed -i 's/<RDS-ENDPOINT>/b2bmarket-db.cxxxxx.us-east-1.rds.amazonaws.com/g' task
 4. Create a second security group — the **ECS Tasks Security Group**:
    - **Name**: `b2b-ecs-sg`
    - **VPC**: LabVPC (or your chosen VPC)
-   - **Inbound Rules**: Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB security group)
+   - **Inbound Rules**:
+     - Type: **Custom TCP**, Port: **8080**, Source: **Custom** → `b2b-alb-sg` (ALB → Shop/Supplier)
+     - Type: **Custom TCP**, Port: **8082**, Source: **Custom** → `b2b-alb-sg` (ALB → Auth)
+     - Type: **Custom TCP**, Port: **8082**, Source: **Custom** → `b2b-ecs-sg` (Shop/Supplier → Auth internal)
    - **Outbound Rules**: Default (all traffic — needed for ECR pulls, RDS access, S3 access, CloudWatch)
 5. Select **Create security group**
 6. Update the RDS security group (`b2b-rds-sg`) to allow traffic from ECS:
@@ -609,7 +612,9 @@ The final layered network architecture:
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │  b2b-ecs-sg (ECS Tasks Security Group)                  │
-│  Inbound:  TCP 8080 from b2b-alb-sg only                │
+│  Inbound:  TCP 8080 from b2b-alb-sg (Shop/Supplier)     │
+│           TCP 8082 from b2b-alb-sg (Auth)                │
+│           TCP 8082 from b2b-ecs-sg (internal)            │
 │  Outbound: All traffic (ECR, S3, CloudWatch, RDS)       │
 └──────────────────────┬──────────────────────────────────┘
                        │ TCP 3306
@@ -666,10 +671,18 @@ For each target group:
 
 1. In the **EC2** console → **Load Balancers** → Select `b2b-alb` → **Listeners and rules**
 2. Select the **HTTP:80** listener → **Manage rules** → **Add rule**
-3. **Add condition**: Select **Path** → Enter `/admin/*`
-4. **Add action**: Forward to → Select `supplier-tg-two`
-5. **Priority**: 1
-6. Select **Create**
+
+**Rule 1 (Priority 1):**
+- **Condition**: Path is `/api/auth/*`, `/login*`, `/register*`
+- **Action**: Forward to `auth-tg-two`
+
+**Rule 2 (Priority 2):**
+- **Condition**: Path is `/api/supplier/*`, `/admin/*`
+- **Action**: Forward to `supplier-tg-two`
+
+**Rule 3 (Priority 3):**
+- **Condition**: Path is `/api/shop/*`
+- **Action**: Forward to `shop-tg-two`
 
 The final listener rules should be:
 

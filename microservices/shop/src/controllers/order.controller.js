@@ -116,6 +116,11 @@ exports.findOne = async (req, res) => {
       });
     });
 
+    // Ownership check
+    if (order.shop_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "Access denied" });
+    }
+
     // Parallel: product + supplier name
     const product = await supplierService.getProductById(order.product_id);
     const supplierUserMap = await authService.getUsersByIds(

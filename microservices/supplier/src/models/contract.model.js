@@ -46,4 +46,28 @@ Contract.getAll = (result) => {
   });
 };
 
+// Create a new contract (from accepted quote)
+Contract.create = (data, result) => {
+  pool.query(
+    "INSERT INTO contracts (shop_id, supplier_id, product_id, quantity, unit_price, total_amount, status) VALUES (?, ?, ?, ?, ?, ?, 'draft')",
+    [data.shop_id, data.supplier_id, data.product_id, data.quantity, data.unit_price, data.unit_price * data.quantity,],
+    (err, res) => {
+      if (err) { result(err, null); return; }
+      result(null, { id: res.insertId, status: "draft" });
+    }
+  );
+};
+
+// Find contracts by shop ID (for shop contract list)
+Contract.findByShopId = (shopId, result) => {
+  pool.query(
+    "SELECT * FROM contracts WHERE shop_id = ? ORDER BY created_at DESC",
+    [shopId],
+    (err, res) => {
+      if (err) { result(err, null); return; }
+      result(null, res);
+    }
+  );
+};
+
 module.exports = Contract;

@@ -6,13 +6,23 @@ const http = require("http");
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8082";
 const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "b2b-internal-key-change-in-production";
 
 /**
  * HTTP GET with timeout — uses native http module (no extra dependencies)
  */
 function httpGet(url, timeoutMs) {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, { timeout: timeoutMs }, (res) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port,
+            path: urlObj.pathname + urlObj.search,
+            method: "GET",
+            timeout: timeoutMs,
+            headers: { "X-Internal-Api-Key": INTERNAL_API_KEY }
+        };
+        const req = http.request(options, (res) => {
             let data = "";
             res.on("data", (chunk) => { data += chunk; });
             res.on("end", () => {
@@ -52,7 +62,8 @@ function httpPost(url, body, timeoutMs) {
             timeout: timeoutMs,
             headers: {
                 "Content-Type": "application/json",
-                "Content-Length": Buffer.byteLength(postData)
+                "Content-Length": Buffer.byteLength(postData),
+                "X-Internal-Api-Key": INTERNAL_API_KEY
             }
         };
         const req = http.request(options, (res) => {

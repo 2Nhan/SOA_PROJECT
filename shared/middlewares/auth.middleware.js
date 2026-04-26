@@ -10,7 +10,7 @@ function requireAuth(req, res, next) {
             return res.status(401).json({ error: "Unauthorized" });
         }
         // Otherwise redirect depending on context
-        const loginUrl = req.baseUrl.startsWith("/admin") ? "/admin/login" : "/login";
+        const loginUrl = req.originalUrl.startsWith("/admin") ? "/admin/login" : "/login";
         return res.redirect(loginUrl);
     }
     next();

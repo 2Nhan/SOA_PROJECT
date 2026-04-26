@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth, requireAdmin } = require("../../../../shared/middlewares/auth.middleware");
+const { requireInternalApiKey } = require("../../../../shared/middlewares/internal-api.middleware");
 const rateLimit = require("express-rate-limit");
 
 const writeLimiter = rateLimit({
@@ -22,19 +23,21 @@ const productApiController = require("../api/product.api");
 const quoteApiController = require("../api/quote.api");
 const contractApiController = require("../api/contract.api");
 
-// --------------- INTERNAL API ROUTES ---------------
-router.get("/api/supplier/products", productApiController.findByIds);
-router.get("/api/supplier/products/active", productApiController.findAllActive);
-router.get("/api/supplier/products/search", productApiController.search);
-router.get("/api/supplier/products/:id", productApiController.findOne);
-router.post("/api/supplier/products/:id/check-stock", productApiController.checkStock);
-router.post("/api/supplier/products/:id/reduce-stock", productApiController.reduceStock);
-router.post("/api/supplier/products/:id/restore-stock", productApiController.restoreStock);
-router.get("/api/supplier/quotes", quoteApiController.findByRfqIds);
-router.get("/api/supplier/quotes/:id", quoteApiController.findOne);
-router.get("/api/supplier/contracts", contractApiController.findByIds);
-router.get("/api/supplier/contracts/:id", contractApiController.findOne);
-router.get("/api/supplier/contracts/count", contractApiController.count);
+// --------------- INTERNAL API ROUTES (protected by internal API key) ---------------
+router.get("/api/supplier/products", requireInternalApiKey, productApiController.findByIds);
+router.get("/api/supplier/products/active", requireInternalApiKey, productApiController.findAllActive);
+router.get("/api/supplier/products/search", requireInternalApiKey, productApiController.search);
+router.get("/api/supplier/products/:id", requireInternalApiKey, productApiController.findOne);
+router.post("/api/supplier/products/:id/check-stock", requireInternalApiKey, productApiController.checkStock);
+router.post("/api/supplier/products/:id/reduce-stock", requireInternalApiKey, productApiController.reduceStock);
+router.post("/api/supplier/products/:id/restore-stock", requireInternalApiKey, productApiController.restoreStock);
+router.get("/api/supplier/quotes", requireInternalApiKey, quoteApiController.findByRfqIds);
+router.get("/api/supplier/quotes/:id", requireInternalApiKey, quoteApiController.findOne);
+router.get("/api/supplier/contracts", requireInternalApiKey, contractApiController.findByIds);
+router.get("/api/supplier/contracts/by-shop", requireInternalApiKey, contractApiController.findByShopId);
+router.get("/api/supplier/contracts/:id", requireInternalApiKey, contractApiController.findOne);
+router.get("/api/supplier/contracts/count", requireInternalApiKey, contractApiController.count);
+router.post("/api/supplier/contracts", requireInternalApiKey, contractApiController.createContract);
 
 // Root redirect
 router.get("/", (req, res) => res.redirect("/admin/"));

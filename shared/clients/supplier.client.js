@@ -6,13 +6,23 @@ const http = require("http");
 
 const SUPPLIER_SERVICE_URL = process.env.SUPPLIER_SERVICE_URL || "http://localhost:8081";
 const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS) || 3000;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "b2b-internal-key-change-in-production";
 
 /**
  * HTTP GET with timeout
  */
 function httpGet(url, timeoutMs) {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, { timeout: timeoutMs }, (res) => {
+        const urlObj = new URL(url);
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port,
+            path: urlObj.pathname + urlObj.search,
+            method: "GET",
+            timeout: timeoutMs,
+            headers: { "X-Internal-Api-Key": INTERNAL_API_KEY }
+        };
+        const req = http.request(options, (res) => {
             let data = "";
             res.on("data", (chunk) => { data += chunk; });
             res.on("end", () => {
@@ -52,7 +62,8 @@ function httpPost(url, body, timeoutMs) {
             timeout: timeoutMs,
             headers: {
                 "Content-Type": "application/json",
-                "Content-Length": Buffer.byteLength(postData)
+                "Content-Length": Buffer.byteLength(postData),
+                "X-Internal-Api-Key": INTERNAL_API_KEY
             }
         };
         const req = http.request(options, (res) => {
@@ -137,7 +148,7 @@ async function searchProducts(keyword) {
  * Returns { success: true, price } or throws error
  */
 async function checkAndReduceStock(productId, quantity) {
-    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${productId}/check-stock`, { quantity }, TIMEOUT_MS);
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/products/${productId}/reduce-stock`, { quantity }, TIMEOUT_MS);
 }
 
 /**
@@ -166,7 +177,6 @@ async function getQuotesByRfqIds(rfqIds) {
         return {};
     }
 }
-
 /**
  * Get contracts data (batch)
  */
@@ -180,6 +190,25 @@ async function getContractsByIds(ids) {
         console.warn(`[SupplierService] getContractsByIds failed: ${err.message}`);
         return {};
     }
+}
+
+/**
+ * Get contracts by shop ID
+ */
+async function getContractsByShopId(shopId) {
+    try {
+        return await httpGet(`${SUPPLIER_SERVICE_URL}/api/supplier/contracts/by-shop?shop_id=${shopId}`, TIMEOUT_MS);
+    } catch (err) {
+        console.warn(`[SupplierService] getContractsByShopId failed: ${err.message}`);
+        return [];
+    }
+}
+
+/**
+ * Create contract from accepted quote
+ */
+async function createContractFromQuote(data) {
+    return await httpPost(`${SUPPLIER_SERVICE_URL}/api/supplier/contracts`, data, TIMEOUT_MS);
 }
 
 /**
@@ -198,5 +227,7 @@ module.exports = {
     restoreStock,
     getQuotesByRfqIds,
     getContractsByIds,
+    getContractsByShopId,
+    createContractFromQuote,
     getFallbackProduct
 };

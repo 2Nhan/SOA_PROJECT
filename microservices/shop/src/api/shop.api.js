@@ -52,10 +52,14 @@ exports.findOneRfq = (req, res) => {
 };
 
 // POST /api/rfqs/:id/status
+const VALID_RFQ_STATUSES = ["pending", "quoted", "accepted", "rejected", "cancelled"];
 exports.updateRfqStatus = (req, res) => {
     const id = parseInt(req.params.id);
     const status = req.body.status;
     if (isNaN(id) || !status) return res.status(400).json({ error: "Invalid ID or status" });
+    if (!VALID_RFQ_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_RFQ_STATUSES.join(", ")}` });
+    }
 
     RFQ.updateStatus(id, status, (err, data) => {
         if (err) return res.status(500).json({ error: "Error updating RFQ status" });
@@ -88,10 +92,14 @@ exports.findOneOrder = (req, res) => {
 };
 
 // POST /api/orders/:id/status
+const VALID_ORDER_STATUSES = ["pending", "confirmed", "cancelled", "paid", "shipped", "delivered"];
 exports.updateOrderStatus = (req, res) => {
     const id = parseInt(req.params.id);
     const status = req.body.status;
     if (isNaN(id) || !status) return res.status(400).json({ error: "Invalid ID or status" });
+    if (!VALID_ORDER_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_ORDER_STATUSES.join(", ")}` });
+    }
 
     Order.updateStatus(id, status, (err, data) => {
         if (err) return res.status(500).json({ error: "Error updating order status" });

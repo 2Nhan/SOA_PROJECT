@@ -1,18 +1,19 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth } = require("../../../../shared/middlewares/auth.middleware");
+const { requireInternalApiKey } = require("../../../../shared/middlewares/internal-api.middleware");
 
 // Import controllers
 const authController = require("../controllers/auth.controller");
 
-// --------------- REST API ROUTES ---------------
-router.get("/api/auth/users", authController.findByIds);
-router.get("/api/auth/users/all", authController.getAllUsersApi);
-router.get("/api/auth/users/stats", authController.statsApi);
-router.get("/api/auth/users/:id", authController.findOneApi);
-router.post("/api/auth/users/:id/approve", authController.approveUserApi);
-router.post("/api/auth/users/:id/reject", authController.rejectUserApi);
-router.post("/api/auth/users/:id/delete", authController.deleteUserApi);
+// --------------- REST API ROUTES (protected by internal API key) ---------------
+router.get("/api/auth/users", requireInternalApiKey, authController.findByIds);
+router.get("/api/auth/users/all", requireInternalApiKey, authController.getAllUsersApi);
+router.get("/api/auth/users/stats", requireInternalApiKey, authController.statsApi);
+router.get("/api/auth/users/:id", requireInternalApiKey, authController.findOneApi);
+router.post("/api/auth/users/:id/approve", requireInternalApiKey, authController.approveUserApi);
+router.post("/api/auth/users/:id/reject", requireInternalApiKey, authController.rejectUserApi);
+router.post("/api/auth/users/:id/delete", requireInternalApiKey, authController.deleteUserApi);
 router.post("/api/auth/login", authController.loginApi);
 router.post("/api/auth/register", authController.registerApi);
 

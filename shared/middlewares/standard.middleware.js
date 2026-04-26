@@ -9,10 +9,21 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 
 exports.applyStandardMiddlewares = (app) => {
-    app.use(helmet({ contentSecurityPolicy: false }));
+    app.use(helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"],
+                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+                fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+                imgSrc: ["'self'", "data:", "https:"],
+            }
+        }
+    }));
 
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
     app.use(cors({
-        origin: process.env.ALLOWED_ORIGINS || "*",
+        origin: allowedOrigins.length > 0 ? allowedOrigins : false,
         methods: ["GET", "POST"]
     }));
 

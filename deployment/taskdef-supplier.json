@@ -44,6 +44,10 @@
         {
           "name": "SUPPLIER_SERVICE_URL",
           "value": "http://<ALB-DNS-NAME>"
+        },
+        {
+          "name": "SHOP_SERVICE_URL",
+          "value": "http://<ALB-DNS-NAME>"
         }
       ],
       "essential": true,

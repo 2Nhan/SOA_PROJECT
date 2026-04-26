@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { requireAuth } = require("../../../../shared/middlewares/auth.middleware");
+const { requireInternalApiKey } = require("../../../../shared/middlewares/internal-api.middleware");
 
 // Import controllers
 const authController = require("../controllers/auth.controller");
@@ -17,15 +18,15 @@ const orderLimiter = rateLimit({
     message: "Too many orders submitted. Please wait a moment."
 });
 
-// --------------- INTERNAL API ROUTES ---------------
-router.get("/api/shop/rfqs", shopApiController.findRfqs);
-router.get("/api/shop/rfqs/all", shopApiController.findAllRfqs);
-router.get("/api/shop/rfqs/:id", shopApiController.findOneRfq);
-router.post("/api/shop/rfqs/:id/status", shopApiController.updateRfqStatus);
-router.get("/api/shop/orders/all", shopApiController.findAllOrders);
-router.get("/api/shop/orders/:id", shopApiController.findOneOrder);
-router.post("/api/shop/orders/:id/status", shopApiController.updateOrderStatus);
-router.get("/api/shop/stats", shopApiController.stats);
+// --------------- INTERNAL API ROUTES (protected by internal API key) ---------------
+router.get("/api/shop/rfqs", requireInternalApiKey, shopApiController.findRfqs);
+router.get("/api/shop/rfqs/all", requireInternalApiKey, shopApiController.findAllRfqs);
+router.get("/api/shop/rfqs/:id", requireInternalApiKey, shopApiController.findOneRfq);
+router.post("/api/shop/rfqs/:id/status", requireInternalApiKey, shopApiController.updateRfqStatus);
+router.get("/api/shop/orders/all", requireInternalApiKey, shopApiController.findAllOrders);
+router.get("/api/shop/orders/:id", requireInternalApiKey, shopApiController.findOneOrder);
+router.post("/api/shop/orders/:id/status", requireInternalApiKey, shopApiController.updateOrderStatus);
+router.get("/api/shop/stats", requireInternalApiKey, shopApiController.stats);
 
 // Auth routes (public)
 router.get("/login", authController.loginForm);

@@ -47,7 +47,7 @@ Product.search = (keyword, result) => {
 };
 
 Product.create = (newProduct, result) => {
-  pool.query("INSERT INTO products (supplier_id, name, description, price, stock, status, category, image_url) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
+  pool.query("INSERT INTO products (supplier_id, name, description, price, stock, status, category, image_url) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
     [newProduct.supplier_id, newProduct.name, newProduct.description, newProduct.price, newProduct.stock, newProduct.category, newProduct.image_url || null],
     (err, res) => {
       if (err) { result(err, null); return; }

@@ -11,7 +11,7 @@ account_id=$(aws sts get-caller-identity --query Account --output text)
 IMAGE_URI="$account_id.dkr.ecr.us-east-1.amazonaws.com/$SERVICE:latest"
 
 echo "=== Building $SERVICE ==="
-cd ~/environment/AWS_LAB
+cd ~/environment/SOA_PROJECT
 # Build from project root to include the shared/ folder
 docker build -t $SERVICE -f ./microservices/$SERVICE/docker/Dockerfile .
 
@@ -21,7 +21,7 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 docker push $IMAGE_URI
 
 echo "=== Registering new task definition ==="
-cd ~/environment/AWS_LAB/deployment
+cd ~/environment/SOA_PROJECT/deployment
 # We register the existing task def directly (AWS fetches the latest image pushed to ECR under the 'latest' tag)
 TASKDEF_ARN=$(aws ecs register-task-definition \
   --cli-input-json file://taskdef-$SERVICE.json \

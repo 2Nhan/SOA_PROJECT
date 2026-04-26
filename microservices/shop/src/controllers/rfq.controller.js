@@ -60,6 +60,11 @@ exports.findOne = async (req, res) => {
       });
     });
 
+    // Ownership check
+    if (rfq.shop_id !== req.session.user.id) {
+      return res.status(403).render("error", { message: "Access denied" });
+    }
+
     // Parallel: product + users + quote
     const userIds = [rfq.supplier_id, rfq.shop_id].filter(Boolean);
     const [product, userMap, quoteMap] = await Promise.all([
@@ -140,17 +145,48 @@ exports.acceptQuote = async (req, res) => {
   try {
     const rfqId = parseInt(req.params.id);
     const quoteId = parseInt(req.params.quoteId);
+    const shopId = req.session.user.id;
     if (isNaN(rfqId) || isNaN(quoteId)) return res.status(400).render("error", { message: "Invalid IDs" });
+
+    // Verify ownership
+    const rfq = await new Promise((resolve, reject) => {
+      RFQ.findById(rfqId, (err, data) => {
+        if (err) { if (err.kind === "not_found") return reject({ status: 404 }); return reject(err); }
+        resolve(data);
+      });
+    });
+    if (rfq.shop_id !== shopId) {
+      return res.status(403).render("error", { message: "Access denied" });
+    }
 
     // Update RFQ status locally
     await new Promise((resolve, reject) => {
       RFQ.acceptQuote(rfqId, (err) => err ? reject(err) : resolve());
     });
 
-    // The contract creation is handled by Supplier service when quote is accepted
-    // For now, redirect to rfqs page
+    // Fetch quote details from Supplier to get pricing info
+    const quoteMap = await supplierService.getQuotesByRfqIds([rfqId]);
+    const quotes = quoteMap[rfqId] || [];
+    const quote = quotes.find(q => q.id === quoteId) || quotes[0];
+
+    if (quote) {
+      // Create contract via Supplier API
+      try {
+        await supplierService.createContractFromQuote({
+          shop_id: shopId,
+          supplier_id: rfq.supplier_id,
+          product_id: rfq.product_id,
+          quantity: rfq.quantity,
+          unit_price: quote.unit_price
+        });
+      } catch (contractErr) {
+        console.error("[RFQ.acceptQuote] Contract creation failed:", contractErr.message);
+      }
+    }
+
     res.redirect("/rfqs");
   } catch (err) {
+    if (err.status === 404) return res.status(404).render("error", { message: "RFQ not found" });
     console.error("[RFQ.acceptQuote Error]", err.message);
     res.status(500).render("error", { message: "Error accepting quote" });
   }
@@ -160,7 +196,19 @@ exports.rejectQuote = async (req, res) => {
   try {
     const rfqId = parseInt(req.params.id);
     const quoteId = parseInt(req.params.quoteId);
+    const shopId = req.session.user.id;
     if (isNaN(rfqId) || isNaN(quoteId)) return res.status(400).render("error", { message: "Invalid IDs" });
+
+    // Verify ownership
+    const rfq = await new Promise((resolve, reject) => {
+      RFQ.findById(rfqId, (err, data) => {
+        if (err) { if (err.kind === "not_found") return reject({ status: 404 }); return reject(err); }
+        resolve(data);
+      });
+    });
+    if (rfq.shop_id !== shopId) {
+      return res.status(403).render("error", { message: "Access denied" });
+    }
 
     // Update RFQ status locally
     await new Promise((resolve, reject) => {
