@@ -9,17 +9,7 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 
 exports.applyStandardMiddlewares = (app) => {
-    // Middleware để "cắt đuôi" prefix từ Load Balancer (ALB)
-    app.use((req, res, next) => {
-        const prefixes = ["/api/auth", "/api/shop", "/api/supplier"];
-        for (const prefix of prefixes) {
-            if (req.url.startsWith(prefix)) {
-                req.url = req.url.slice(prefix.length) || "/";
-                break;
-            }
-        }
-        next();
-    });
+    // (Removed prefix stripping middleware to avoid conflicts with explicit route definitions)
 
     const directives = helmet.contentSecurityPolicy.getDefaultDirectives();
     delete directives["upgrade-insecure-requests"]; // Xóa bỏ hoàn toàn việc ép HTTPS
