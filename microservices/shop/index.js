@@ -39,7 +39,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     sameSite: "lax",
-    secure: false, // Must be false for HTTP lab ALB
+    secure: process.env.NODE_ENV === "production",
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
