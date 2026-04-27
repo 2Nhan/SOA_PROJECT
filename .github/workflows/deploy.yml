@@ -22,9 +22,6 @@ env:
   CODEDEPLOY_APP: b2b-marketplace
 
 jobs:
-  # ──────────────────────────────────────────────
-  # Step 1: Detect which services changed
-  # ──────────────────────────────────────────────
   detect-changes:
     name: Detect Changed Services
     runs-on: ubuntu-latest
@@ -62,7 +59,7 @@ jobs:
           if echo "$CHANGED" | grep -q "^microservices/auth/"; then echo "auth=true" >> $GITHUB_OUTPUT; else echo "auth=false" >> $GITHUB_OUTPUT; fi
 
   # ──────────────────────────────────────────────
-  # Step 2: Deploy Each Service
+  # Deploy Jobs (Corrected Family Names)
   # ──────────────────────────────────────────────
 
   deploy-shop:
@@ -72,7 +69,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -90,18 +86,15 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           docker build -t shop -f ./microservices/shop/docker/Dockerfile .
-          docker tag shop:latest $ECR_REGISTRY/shop:latest
           docker tag shop:latest $ECR_REGISTRY/shop:${{ github.sha }}
-          docker push $ECR_REGISTRY/shop:latest
           docker push $ECR_REGISTRY/shop:${{ github.sha }}
 
       - name: Update and Register Task Definition
         id: taskdef
         run: |
-          # Fetch current definition from AWS (verify 'shop-service' family name in console)
-          aws ecs describe-task-definition --task-definition shop-service --query 'taskDefinition' > temp-td.json
+          # Use 'shop' family name
+          aws ecs describe-task-definition --task-definition shop --query 'taskDefinition' > temp-td.json
           
-          # Use jq to update the image and strip system metadata
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
              .containerDefinitions[0].image = "${{ steps.ecr-login.outputs.registry }}/shop:${{ github.sha }}"' \
              temp-td.json > final-td.json
@@ -109,22 +102,18 @@ jobs:
           TASKDEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://final-td.json \
             --query 'taskDefinition.taskDefinitionArn' --output text)
-          
           echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
-          echo "✅ Registered: $TASKDEF_ARN"
 
-      - name: Deploy via CodeDeploy (Blue/Green)
+      - name: Deploy via CodeDeploy
         run: |
           cp deployment/appspec-shop.yaml /tmp/appspec-shop.yaml
           sed -i "s|<TASK_DEFINITION>|${{ steps.taskdef.outputs.arn }}|g" /tmp/appspec-shop.yaml
           aws s3 cp /tmp/appspec-shop.yaml s3://${{ env.S3_BUCKET }}/deploy/appspec-shop.yaml
 
-          DEPL_ID=$(aws deploy create-deployment \
+          aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APP }} \
             --deployment-group-name b2b-shop-dg \
-            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-shop.yaml,bundleType=YAML \
-            --query 'deploymentId' --output text)
-          echo "🚀 Shop deployment started: $DEPL_ID"
+            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-shop.yaml,bundleType=YAML
 
   deploy-supplier:
     name: Deploy Supplier Service
@@ -133,7 +122,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -151,15 +139,14 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           docker build -t supplier -f ./microservices/supplier/docker/Dockerfile .
-          docker tag supplier:latest $ECR_REGISTRY/supplier:latest
           docker tag supplier:latest $ECR_REGISTRY/supplier:${{ github.sha }}
-          docker push $ECR_REGISTRY/supplier:latest
           docker push $ECR_REGISTRY/supplier:${{ github.sha }}
 
       - name: Update and Register Task Definition
         id: taskdef
         run: |
-          aws ecs describe-task-definition --task-definition supplier-service --query 'taskDefinition' > temp-td.json
+          # Use 'supplier' family name
+          aws ecs describe-task-definition --task-definition supplier --query 'taskDefinition' > temp-td.json
           
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
              .containerDefinitions[0].image = "${{ steps.ecr-login.outputs.registry }}/supplier:${{ github.sha }}"' \
@@ -168,21 +155,18 @@ jobs:
           TASKDEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://final-td.json \
             --query 'taskDefinition.taskDefinitionArn' --output text)
-          
           echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Deploy via CodeDeploy (Blue/Green)
+      - name: Deploy via CodeDeploy
         run: |
           cp deployment/appspec-supplier.yaml /tmp/appspec-supplier.yaml
           sed -i "s|<TASK_DEFINITION>|${{ steps.taskdef.outputs.arn }}|g" /tmp/appspec-supplier.yaml
           aws s3 cp /tmp/appspec-supplier.yaml s3://${{ env.S3_BUCKET }}/deploy/appspec-supplier.yaml
 
-          DEPL_ID=$(aws deploy create-deployment \
+          aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APP }} \
             --deployment-group-name b2b-supplier-dg \
-            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-supplier.yaml,bundleType=YAML \
-            --query 'deploymentId' --output text)
-          echo "🚀 Supplier deployment started: $DEPL_ID"
+            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-supplier.yaml,bundleType=YAML
 
   deploy-auth:
     name: Deploy Auth Service
@@ -191,7 +175,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -209,15 +192,14 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           docker build -t auth -f ./microservices/auth/docker/Dockerfile .
-          docker tag auth:latest $ECR_REGISTRY/auth:latest
           docker tag auth:latest $ECR_REGISTRY/auth:${{ github.sha }}
-          docker push $ECR_REGISTRY/auth:latest
           docker push $ECR_REGISTRY/auth:${{ github.sha }}
 
       - name: Update and Register Task Definition
         id: taskdef
         run: |
-          aws ecs describe-task-definition --task-definition auth-service --query 'taskDefinition' > temp-td.json
+          # Use 'auth' family name
+          aws ecs describe-task-definition --task-definition auth --query 'taskDefinition' > temp-td.json
           
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
              .containerDefinitions[0].image = "${{ steps.ecr-login.outputs.registry }}/auth:${{ github.sha }}"' \
@@ -226,18 +208,15 @@ jobs:
           TASKDEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://final-td.json \
             --query 'taskDefinition.taskDefinitionArn' --output text)
-          
           echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Deploy via CodeDeploy (Blue/Green)
+      - name: Deploy via CodeDeploy
         run: |
           cp deployment/appspec-auth.yaml /tmp/appspec-auth.yaml
           sed -i "s|<TASK_DEFINITION>|${{ steps.taskdef.outputs.arn }}|g" /tmp/appspec-auth.yaml
           aws s3 cp /tmp/appspec-auth.yaml s3://${{ env.S3_BUCKET }}/deploy/appspec-auth.yaml
 
-          DEPL_ID=$(aws deploy create-deployment \
+          aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APP }} \
             --deployment-group-name b2b-auth-dg \
-            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-auth.yaml,bundleType=YAML \
-            --query 'deploymentId' --output text)
-          echo "🚀 Auth deployment started: $DEPL_ID"
+            --s3-location bucket=${{ env.S3_BUCKET }},key=deploy/appspec-auth.yaml,bundleType=YAML
