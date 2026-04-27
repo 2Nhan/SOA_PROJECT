@@ -157,9 +157,20 @@ jobs:
       - name: Register new Task Definition
         id: taskdef
         run: |
+          # 1. Automatically find the LabRole ARN (common in Voclabs/AWS Academy)
+          # If not in a lab, replace 'LabRole' with your specific role name
+          ROLE_ARN=$(aws iam get-role --role-name LabRole --query 'Role.Arn' --output text)
+          echo "Using Role ARN: $ROLE_ARN"
+
+          # 2. Create a temporary version of the taskdef with the real ARN
+          cp deployment/taskdef-shop.json /tmp/taskdef-shop.json
+          sed -i "s|<ECS_ROLE_ARN>|$ROLE_ARN|g" /tmp/taskdef-shop.json
+
+          # 3. Register the task definition using the updated file
           TASKDEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://deployment/taskdef-supplier.json \
+            --cli-input-json file:///tmp/taskdef-shop.json \
             --query 'taskDefinition.taskDefinitionArn' --output text)
+          
           echo "arn=$TASKDEF_ARN" >> $GITHUB_OUTPUT
           echo "✅ Registered: $TASKDEF_ARN"
 
