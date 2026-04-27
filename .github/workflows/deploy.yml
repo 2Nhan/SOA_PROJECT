@@ -97,7 +97,7 @@ jobs:
           
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
              .containerDefinitions[0].image = "${{ steps.ecr-login.outputs.registry }}/shop:${{ github.sha }}" |
-             .containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name != "SESSION_DB_NAME")) + [{"name": "SESSION_DB_NAME", "value": "auth_db"}])' \
+             .containerDefinitions[0].environment |= (map(select(.name != "SESSION_DB_NAME")) + [{"name": "SESSION_DB_NAME", "value": "auth_db"}])' \
              temp-td.json > final-td.json
 
           TASKDEF_ARN=$(aws ecs register-task-definition \
@@ -151,7 +151,7 @@ jobs:
           
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
              .containerDefinitions[0].image = "${{ steps.ecr-login.outputs.registry }}/supplier:${{ github.sha }}" |
-             .containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name != "SESSION_DB_NAME")) + [{"name": "SESSION_DB_NAME", "value": "auth_db"}])' \
+             .containerDefinitions[0].environment |= (map(select(.name != "SESSION_DB_NAME")) + [{"name": "SESSION_DB_NAME", "value": "auth_db"}])' \
              temp-td.json > final-td.json
 
           TASKDEF_ARN=$(aws ecs register-task-definition \
@@ -205,7 +205,7 @@ jobs:
           
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
              .containerDefinitions[0].image = "${{ steps.ecr-login.outputs.registry }}/auth:${{ github.sha }}" |
-             .containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name != "SESSION_DB_NAME")) + [{"name": "SESSION_DB_NAME", "value": "auth_db"}])' \
+             .containerDefinitions[0].environment |= (map(select(.name != "SESSION_DB_NAME")) + [{"name": "SESSION_DB_NAME", "value": "auth_db"}])' \
              temp-td.json > final-td.json
 
           TASKDEF_ARN=$(aws ecs register-task-definition \
