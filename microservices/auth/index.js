@@ -35,11 +35,11 @@ app.use(session({
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    proxy: true,
+    proxy: true, // Thêm dòng này để hoạt động tốt sau ALB
     cookie: {
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        secure: false, // Vì Lab dùng HTTP nên để false
         maxAge: 24 * 60 * 60 * 1000
     }
 }));
