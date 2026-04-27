@@ -12,7 +12,7 @@ exports.applyStandardMiddlewares = (app) => {
     // (Removed prefix stripping middleware to avoid conflicts with explicit route definitions)
 
     const directives = helmet.contentSecurityPolicy.getDefaultDirectives();
-    delete directives["upgrade-insecure-requests"]; // Xóa bỏ hoàn toàn việc ép HTTPS
+    directives["upgrade-insecure-requests"] = null; // Explicitly nullify to prevent upgrade
 
     app.use(helmet({
         contentSecurityPolicy: {
@@ -50,5 +50,5 @@ exports.applyStandardMiddlewares = (app) => {
     app.use(express.urlencoded({ extended: true, limit: "1mb" }));
     app.use(express.json({ limit: "1mb" }));
 
-    app.set("trust proxy", 1);
+    // app.set("trust proxy", 1); // Disable for local lab to prevent false HTTPS detection
 };
