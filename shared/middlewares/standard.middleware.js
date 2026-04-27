@@ -40,8 +40,7 @@ exports.applyStandardMiddlewares = (app) => {
 
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
     app.use(cors({
-        origin: allowedOrigins.length > 0 ? allowedOrigins : true, // Fallback to true for development/ALB testing
-        credentials: true,
+        origin: allowedOrigins.length > 0 ? allowedOrigins : false,
         methods: ["GET", "POST"]
     }));
 
