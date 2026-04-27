@@ -603,7 +603,7 @@ Bây giờ, hãy chạy kịch bản Bash duy nhất dưới đây. Script này 
 cd ~/environment/SOA_PROJECT/deployment
 
 # 1. Cấu hình các biến (HÃY SỬA TÊN S3 BUCKET CỦA BẠN TẠI ĐÂY)
-S3_BUCKET_NAME="b2b-marketplace-images" 
+S3_BUCKET_NAME="b2b-marketplace-images-23521076" 
 
 # 2. Lấy thông tin tài nguyên từ AWS
 echo "Đang lấy các giá trị từ AWS..."
