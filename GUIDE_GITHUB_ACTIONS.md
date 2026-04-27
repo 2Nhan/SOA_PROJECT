@@ -777,23 +777,24 @@ File `.github/workflows/deploy.yml` đã có sẵn trong project. Workflow này:
 5. **Push**: Push image lên ECR với 2 tags: `latest` + commit SHA
 6. **Deploy**: Register task definition mới → Trigger CodeDeploy Blue/Green
 
-### Task 10.2: Lấy AWS Credentials từ Learner Lab
+### Task 10.2: Lấy AWS Credentials và S3 Bucket từ Lab
 
-1. Trong AWS Academy → Bấm **AWS Details** (hoặc nút Show)
-2. Bấm **Show** bên cạnh **AWS CLI**
-3. Copy 3 giá trị:
-   - `aws_access_key_id`
-   - `aws_secret_access_key`
-   - `aws_session_token`
+1. **Lấy AWS Credentials:** Trong AWS Academy → Bấm **AWS Details** → **Show** bên cạnh **AWS CLI** và copy 3 giá trị (`aws_access_key_id`, `aws_secret_access_key`, `aws_session_token`).
+2. **Lấy tên S3 Bucket:** Truy cập **S3 console** → Tìm bucket bạn đã tạo ở Phase 2 (thường có dạng `b2b-marketplace-images-<mssv>`). **Copy chính xác tên này.**
 
-4. Truy cập GitHub Repo của bạn → **Settings** → **Secrets and variables** → **Actions**
-5. Tạo 4 **Repository secrets**:
-   - `AWS_ACCESS_KEY_ID`: Dán giá trị từ Lab
-   - `AWS_SECRET_ACCESS_KEY`: Dán giá trị từ Lab
-   - `AWS_SESSION_TOKEN`: Dán giá trị từ Lab
-   - `S3_BUCKET`: `b2b-marketplace-images-23521076` (Hoặc bucket của bạn)
+3. Truy cập GitHub Repo của bạn → **Settings** → **Secrets and variables** → **Actions**
+4. Tạo và cập nhật **4 Repository secrets** sau:
 
-> ⚠️ **QUAN TRỌNG**: Credentials Learner Lab **hết hạn mỗi khi lab session kết thúc**. Bạn phải update GitHub Secrets mỗi khi start lab mới.
+| Secret Name | Nội dung (Value) |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | Dán giá trị từ Lab |
+| `AWS_SECRET_ACCESS_KEY` | Dán giá trị từ Lab |
+| `AWS_SESSION_TOKEN` | Dán giá trị từ Lab |
+| `S3_BUCKET` | **Dán chính xác tên S3 Bucket bạn vừa copy ở bước 2** |
+
+> ⚠️ **QUAN TRỌNG**: 
+> *   Credentials của Learner Lab sẽ **hết hạn** sau mỗi phiên làm việc. Bạn phải cập nhật 3 mã AWS Secrets mỗi khi bắt đầu buổi Lab mới.
+> *   `S3_BUCKET` là tên duy nhất của bạn, nếu điền sai Pipeline sẽ không thể upload file cấu hình và sẽ báo lỗi.
 
 ### Task 10.3: Thêm AWS Secrets vào GitHub Repository
 

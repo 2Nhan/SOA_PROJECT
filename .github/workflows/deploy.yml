@@ -18,7 +18,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  S3_BUCKET: b2b-marketplace-images
+  S3_BUCKET: ${{ secrets.S3_BUCKET }}
   CODEDEPLOY_APP: b2b-marketplace
 
 jobs:
