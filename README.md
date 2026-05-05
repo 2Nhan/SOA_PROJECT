@@ -279,8 +279,8 @@ aws deploy create-deployment \
 
 | AWS Service | Purpose | Configuration |
 |---|---|---|
-| Amazon ECS (Fargate) | Container orchestration | 2 services, 1 task each, 0.25 vCPU / 512MB RAM |
-| Amazon ECR | Docker image registry | 2 private repositories (shop, supplier) |
+| Amazon ECS (Fargate) | Container orchestration | 3 services, 1 task each, 0.25 vCPU / 512MB RAM |
+| Amazon ECR | Docker image registry | 3 private repositories (shop, supplier, auth) |
 | Application Load Balancer | Traffic routing & health checks | Path-based routing (`/admin/*` → Supplier, default → Shop), 4 target groups for blue/green |
 | Amazon RDS (MySQL 8.0) | Managed database | db.c6gd.medium, Single-AZ, 20GB gp3 |
 | Amazon S3 | Product image storage | Public-read bucket for supplier product photos |
